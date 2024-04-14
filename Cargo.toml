@@ -1,0 +1,12 @@
+workspace = { members = ["a"] }
+[package]
+name = "engarde_client"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0.197", features = ["derive"] }
+serde-aux = { version = "4.5.0", default-features = false }
+serde_json = "1.0.115"
