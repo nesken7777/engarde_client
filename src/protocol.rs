@@ -156,7 +156,7 @@ pub struct Evaluation {
 }
 
 #[derive(Serialize)]
-pub struct Movement {
+pub struct PlayMovement {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
@@ -172,7 +172,7 @@ pub struct Movement {
 }
 
 #[derive(Serialize)]
-pub struct Attack {
+pub struct PlayAttack {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
@@ -188,7 +188,7 @@ pub struct Attack {
 }
 
 #[derive(Serialize)]
-pub struct Parry {
+pub struct PlayParry {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
