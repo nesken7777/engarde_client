@@ -220,3 +220,21 @@ pub struct RoundEnd {
     #[serde(rename = "Message")]
     message: String,
 }
+
+#[derive(Deserialize)]
+pub struct GameEnd {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
+    winner: u8,
+    #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
+    score_0: u8,
+    #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
+    score_1: u8,
+    #[serde(rename = "Message")]
+    message: String,
+}
