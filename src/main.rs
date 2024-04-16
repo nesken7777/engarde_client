@@ -1,5 +1,7 @@
 mod protocol;
-use protocol::{BoardInfo, ConnectionStart, NameReceived, PlayerName};
+use protocol::{
+    BoardInfo, ConnectionStart, HandInfo, Messages, NameReceived, PlayerName, RequestedPlay,
+};
 use serde::Serialize;
 use std::{
     error::Error,
@@ -7,35 +9,61 @@ use std::{
     io::{stdout, BufRead, BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
 };
-
+use Messages::*;
+use RequestedPlay::*;
 fn main() -> Result<(), Box<dyn Error>> {
+    // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    let player_id = connect(&mut bufreader);
+    connect(&mut bufreader)?;
     {
+        // ここはどうする?標準入力にする?
         let player_name = PlayerName::new("abc".to_string());
         send_info(&mut bufwriter, &player_name)?;
         let string = read_stream(&mut bufreader)?;
         let name_received = serde_json::from_str::<NameReceived>(&string)?;
-        print(&name_received)?;
+        println!("{:?}", name_received);
     }
     {
-        let string = read_stream(&mut bufreader)?;
-        let board_info = serde_json::from_str::<BoardInfo>(&string)?;
-        print(&board_info)?;
+        let mut board_state = BoardInfo::new();
+        let mut hand_state = HandInfo::new();
+        loop {
+            match Messages::parse(&read_stream(&mut bufreader)?)? {
+                BoardInfo(board_info) => {
+                    board_state = board_info;
+                }
+                HandInfo(hand_info) => hand_state = hand_info,
+                DoPlay(do_play) => {
+                    let play_mode = RequestedPlay::from_id(do_play.message_id)?;
+                    match play_mode {
+                        NormalTurn => {
+                            println!("どうする?");
+                            let hands = hand_state.to_vec();
+                            let play_mode = ();
+                            let number = {
+                                loop {
+                                    println!("カードを選んでね");
+                                    let mut string = String::new();
+                                    std::io::stdin().read_line(&mut string)?;
+                                    let kouho = string.trim().parse::<u8>()?;
+                                    if !hands.contains(&kouho) {
+                                        println!("そのカードは無いよ");
+                                    } else {
+                                        break kouho;
+                                    }
+                                }
+                            };
+                        }
+                        Parry => (),
+                    }
+                }
+                RoundEnd(round_end) => (),
+                GameEnd(game_end) => break,
+            }
+        }
     }
-    Ok(())
-}
-
-fn print<T>(obj: &T) -> Result<(), Box<dyn Error>>
-where
-    T: Debug,
-{
-    let mut out = stdout();
-    out.write_all(format!("{:?}\r\n", obj).as_bytes())?;
-    out.flush()?;
     Ok(())
 }
 
@@ -65,6 +93,6 @@ where
 {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
-    print(&connection_start)?;
+    println!("{:?}", connection_start);
     Ok(connection_start.client_id)
 }
