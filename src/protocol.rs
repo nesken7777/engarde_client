@@ -1,5 +1,52 @@
+use std::{error::Error, fmt::Display};
+
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
+use serde_json::Value;
+
+//ゲーム中に繰り返し受信されるJSON達
+// ConnectionStartとNameReceivedは最初しか来ないので除外
+pub enum Messages {
+    BoardInfo(BoardInfo),
+    HandInfo(HandInfo),
+    DoPlay(DoPlay),
+    RoundEnd(RoundEnd),
+    GameEnd(GameEnd),
+}
+
+#[derive(Debug)]
+struct MessageParseError {
+    invalid_info: String,
+}
+
+impl Display for MessageParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MessageParseError, json is {}", self.invalid_info)
+    }
+}
+
+impl Error for MessageParseError {}
+
+impl Messages {
+    pub fn parse(json: &str) -> Result<Messages, Box<dyn Error>> {
+        let obj = serde_json::from_str::<Value>(json)?;
+        let typ = obj
+            .get("Type")
+            .ok_or("Typeキー無し")?
+            .as_str()
+            .ok_or("Typeが文字列ではない")?;
+        match typ {
+            "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_value(obj)?)),
+            "HandInfo" => Ok(Self::HandInfo(serde_json::from_value(obj)?)),
+            "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
+            "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
+            "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
+            _ => Err(MessageParseError {
+                invalid_info: json.to_string(),
+            })?,
+        }
+    }
+}
 
 #[derive(Deserialize, Debug)]
 pub struct ConnectionStart {
@@ -89,6 +136,22 @@ pub struct BoardInfo {
     current_player: u8,
 }
 
+impl BoardInfo {
+    pub fn new() -> Self {
+        BoardInfo {
+            typ: String::new(),
+            from: String::new(),
+            to: String::new(),
+            player_position_0: 0,
+            player_position_1: 23,
+            player_score_0: 0,
+            player_score_1: 0,
+            num_of_deck: 15,
+            current_player: 0,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct HandInfo {
     #[serde(rename = "Type")]
@@ -109,6 +172,25 @@ pub struct HandInfo {
     hand5: u8,
 }
 
+impl HandInfo {
+    pub fn new() -> Self {
+        HandInfo {
+            typ: String::from("HandInfo"),
+            from: String::from("Server"),
+            to: String::from("Client"),
+            hand1: 0,
+            hand2: 0,
+            hand3: 0,
+            hand4: 0,
+            hand5: 0,
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        vec![self.hand1, self.hand2, self.hand3, self.hand4, self.hand5]
+    }
+}
+
 #[derive(Deserialize)]
 pub struct DoPlay {
     #[serde(rename = "Type")]
@@ -121,8 +203,34 @@ pub struct DoPlay {
         rename = "MessageID",
         deserialize_with = "deserialize_number_from_string"
     )]
-    message_id: u8,
+    pub message_id: u8,
     message: String,
+}
+
+pub enum RequestedPlay {
+    NormalTurn,
+    Parry,
+}
+
+#[derive(Debug)]
+pub struct InvalidPlayId;
+
+impl Display for InvalidPlayId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InvalidPlayId")
+    }
+}
+
+impl Error for InvalidPlayId {}
+
+impl RequestedPlay {
+    pub fn from_id(message_id: u8) -> Result<Self, InvalidPlayId> {
+        match message_id {
+            101 => Ok(Self::NormalTurn),
+            102 => Ok(Self::Parry),
+            _ => Err(InvalidPlayId),
+        }
+    }
 }
 
 #[derive(Serialize)]
