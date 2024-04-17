@@ -5,8 +5,7 @@ use protocol::{
 use serde::Serialize;
 use std::{
     error::Error,
-    fmt::Debug,
-    io::{stdout, BufRead, BufReader, BufWriter, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
 };
 use Messages::*;
@@ -22,8 +21,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         // ここはどうする?標準入力にする?
         println!("名前を入力");
-        let name=read_keybord();
-        println!("{}",name);
+        let name = read_keybord()?;
+        println!("{}", name);
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let string = read_stream(&mut bufreader)?;
@@ -101,10 +100,9 @@ where
     Ok(connection_start.client_id)
 }
 
-
-fn read_keybord()-> String{
+fn read_keybord() -> Result<String, io::Error> {
     let mut word = String::new();
-    std::io::stdin().read_line(&mut word).ok();
+    std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
-    response
+    Ok(response)
 }
