@@ -11,6 +11,7 @@ use std::{
 };
 use Messages::*;
 use RequestedPlay::*;
+
 fn main() -> Result<(), Box<dyn Error>> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
@@ -95,4 +96,13 @@ where
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
     println!("{:?}", connection_start);
     Ok(connection_start.client_id)
+}
+
+fn permutation(n: u64, r: u64) -> u64 {
+    (n - r + 1..=n).product()
+}
+
+fn combination(n: u64, mut r: u64) -> u64{
+    let perm = permutation(n, r);
+    perm / (1..=r).product()
 }
