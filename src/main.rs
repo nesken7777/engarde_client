@@ -11,6 +11,7 @@ use std::{
 };
 use Messages::*;
 use RequestedPlay::*;
+
 fn main() -> Result<(), Box<dyn Error>> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
@@ -100,9 +101,19 @@ where
     Ok(connection_start.client_id)
 }
 
+
 fn read_keybord()-> String{
     let mut word = String::new();
     std::io::stdin().read_line(&mut word).ok();
     let response = word.trim().to_string();
     response
+}
+
+fn permutation(n: u64, r: u64) -> u64 {
+    (n - r + 1..=n).product()
+}
+
+fn combination(n: u64, mut r: u64) -> u64{
+    let perm = permutation(n, r);
+    perm / (1..=r).product()
 }
