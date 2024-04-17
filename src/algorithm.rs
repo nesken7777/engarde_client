@@ -1,21 +1,8 @@
-
-
-fn npr(mut n: i32,mut r: i32) -> i32{
-    let mut number = 1;
-    while r > 0{
-        number *= r;
-        n -= 1;
-        r -= 1;
-    }
-    number
+fn permutation(n: u64, r: u64) -> u64 {
+    (n - r + 1..=n).product()
 }
 
-fn ncr(n: i32,mut r: i32) -> i32{
-    let perm = npr(n,r);
-    let mut number = 1;
-    while r > 0{
-        number *= r;
-        r -= 1;
-    }
-    perm/number
+fn combination(n: u64, mut r: u64) -> u64 {
+    let perm = permutation(n, r);
+    perm / (1..=r).product::<u64>()
 }
