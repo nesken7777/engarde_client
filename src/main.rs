@@ -11,6 +11,7 @@ use std::{
 };
 use Messages::*;
 use RequestedPlay::*;
+
 fn main() -> Result<(), Box<dyn Error>> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
@@ -95,4 +96,24 @@ where
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
     println!("{:?}", connection_start);
     Ok(connection_start.client_id)
+}
+
+fn npr(mut n: i32,mut r: i32) -> i32{
+    let mut number = 1;
+    while r > 0{
+        number *= r;
+        n -= 1;
+        r -= 1;
+    }
+    number
+}
+
+fn ncr(n: i32,mut r: i32) -> i32{
+    let perm = npr(n,r);
+    let mut number = 1;
+    while r > 0{
+        number *= r;
+        r -= 1;
+    }
+    perm/number
 }
