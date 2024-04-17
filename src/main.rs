@@ -21,7 +21,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     connect(&mut bufreader)?;
     {
         // ここはどうする?標準入力にする?
-        let player_name = PlayerName::new("abc".to_string());
+        println!("名前を入力");
+        let name=read_keybord();
+        println!("{}",name);
+        let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let string = read_stream(&mut bufreader)?;
         let name_received = serde_json::from_str::<NameReceived>(&string)?;
@@ -96,6 +99,14 @@ where
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
     println!("{:?}", connection_start);
     Ok(connection_start.client_id)
+}
+
+
+fn read_keybord()-> String{
+    let mut word = String::new();
+    std::io::stdin().read_line(&mut word).ok();
+    let response = word.trim().to_string();
+    response
 }
 
 fn permutation(n: u64, r: u64) -> u64 {
