@@ -10,8 +10,10 @@ use std::{
     error::Error,
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    vec,
 };
 use Messages::*;
+mod algorithm;
 
 fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
@@ -34,6 +36,8 @@ fn main() -> Result<(), Errors> {
     }
     {
         let mut board_state = BoardInfo::new();
+        let mut cards = vec![5, 5];
+
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
@@ -58,6 +62,7 @@ fn main() -> Result<(), Errors> {
                         print("エラーもらった")?;
                         act(&my_info, &board_state, &mut bufwriter)?;
                     }
+                    Played(played) => algorithm::used_card(&mut cards, played),
                     RoundEnd(_round_end) => (),
                     GameEnd(_game_end) => break,
                 },

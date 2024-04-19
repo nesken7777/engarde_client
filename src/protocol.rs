@@ -12,6 +12,7 @@ pub enum Messages {
     BoardInfo(BoardInfo),
     HandInfo(HandInfo),
     DoPlay(DoPlay),
+    Played(Played),
     RoundEnd(RoundEnd),
     GameEnd(GameEnd),
     ServerError(ServerError),
@@ -44,6 +45,7 @@ impl Messages {
             "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
             "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
             "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
+            "Played" => Ok(Self::Played(serde_json::from_value(obj)?)),
             "Error" => Ok(Self::ServerError(serde_json::from_value(obj)?)),
             _ => Err(ParseMessageError {
                 invalid_info: json.to_string(),
@@ -263,6 +265,22 @@ pub struct Evaluation {
     pub eval_5f: Option<String>,
     #[serde(rename = "5B")]
     pub eval_5b: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct Played {
+    #[serde(rename = "Type")]
+    pub typ: String,
+    #[serde(rename = "From")]
+    pub from: String,
+    #[serde(rename = "To")]
+    pub to: String,
+    #[serde(rename = "MessageID")]
+    pub message_id: String,
+    #[serde(rename = "PlayCard")]
+    pub play_card: String,
+    #[serde(rename = "Direction")]
+    pub direction: String,
 }
 
 impl Evaluation {
