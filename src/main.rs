@@ -8,11 +8,11 @@ use serde::Serialize;
 use std::{
     error::Error,
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream}, vec,
 };
 use Messages::*;
 use RequestedPlay::*;
-
+mod algorithm;
 fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
@@ -34,6 +34,7 @@ fn main() -> Result<(), Errors> {
     {
         let mut board_state = BoardInfo::new();
         let mut hand_state = HandInfo::new();
+        let mut cards = vec![5,5];
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?)? {
                 BoardInfo(board_info) => {
@@ -64,8 +65,11 @@ fn main() -> Result<(), Errors> {
                         Parry => (),
                     }
                 }
+                Played(played)=>algorithm::used_card(&mut cards,played),
                 RoundEnd(round_end) => (),
                 GameEnd(game_end) => break,
+
+
             }
         }
     }
@@ -113,11 +117,5 @@ fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();
     stdout.write_all(string.as_bytes())?;
     stdout.flush()
-}
-
-
-fn combination(n: u64, mut r: u64) -> u64{
-    let perm = permutation(n, r);
-    perm / (1..=r).product::<u64>()
 }
 

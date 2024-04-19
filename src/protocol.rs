@@ -14,6 +14,7 @@ pub enum Messages {
     DoPlay(DoPlay),
     RoundEnd(RoundEnd),
     GameEnd(GameEnd),
+    Played(Played),
 }
 
 #[derive(Debug)]
@@ -43,6 +44,7 @@ impl Messages {
             "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
             "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
             "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
+            "Played"=> Ok(Self::Played(serde_json::from_value(obj)?)),
             _ => Err(ParseMessageError {
                 invalid_info: json.to_string(),
             })?,
@@ -347,4 +349,21 @@ pub struct GameEnd {
     pub score_1: u8,
     #[serde(rename = "Message")]
     pub message: String,
+}
+
+
+#[derive(Deserialize)]
+pub struct Played {
+    #[serde(rename = "Type")]
+    pub typ: String,
+    #[serde(rename = "From")]
+    pub from: String,
+    #[serde(rename = "To")]
+    pub to: String,
+    #[serde(rename = "MessageID")]
+    pub message_id: String,
+    #[serde(rename = "PlayCard")]
+    pub play_card: String,
+    #[serde(rename = "Direction")]
+    pub direction: String,
 }
