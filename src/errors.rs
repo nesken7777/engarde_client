@@ -1,13 +1,13 @@
-use std::{fmt::Display, io, num::ParseIntError};
 use crate::protocol::{InvalidPlayId, ParseMessageError};
+use std::{fmt::Display, io, num::ParseIntError};
 
 #[derive(Debug)]
-pub enum  Errors {
+pub enum Errors {
     IO(io::Error),
     MessageParse(ParseMessageError),
     ParseInt(ParseIntError),
     Serde(serde_json::Error),
-    InvalidPlayId(InvalidPlayId)
+    InvalidPlayId(InvalidPlayId),
 }
 
 use Errors::*;

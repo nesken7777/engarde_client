@@ -8,7 +8,8 @@ use serde::Serialize;
 use std::{
     error::Error,
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream}, vec,
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    vec,
 };
 use Messages::*;
 use RequestedPlay::*;
@@ -34,7 +35,7 @@ fn main() -> Result<(), Errors> {
     {
         let mut board_state = BoardInfo::new();
         let mut hand_state = HandInfo::new();
-        let mut cards = vec![5,5];
+        let mut cards = vec![5, 5];
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?)? {
                 BoardInfo(board_info) => {
@@ -65,11 +66,9 @@ fn main() -> Result<(), Errors> {
                         Parry => (),
                     }
                 }
-                Played(played)=>algorithm::used_card(&mut cards,played),
+                Played(played) => algorithm::used_card(&mut cards, played),
                 RoundEnd(round_end) => (),
                 GameEnd(game_end) => break,
-
-
             }
         }
     }
@@ -118,4 +117,3 @@ fn print(string: &str) -> io::Result<()> {
     stdout.write_all(string.as_bytes())?;
     stdout.flush()
 }
-
