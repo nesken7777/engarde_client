@@ -20,14 +20,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     connect(&mut bufreader)?;
     {
         // ここはどうする?標準入力にする?
-        println!("名前を入力");
+        print("名前を入力")?;
         let name = read_keybord()?;
-        println!("{}", name);
+        print(format!("{}", name).as_str())?;
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let string = read_stream(&mut bufreader)?;
         let name_received = serde_json::from_str::<NameReceived>(&string)?;
-        println!("{:?}", name_received);
+        print(format!("{:?}", name_received).as_str())?;
     }
     {
         let mut board_state = BoardInfo::new();
@@ -42,17 +42,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let play_mode = RequestedPlay::from_id(do_play.message_id)?;
                     match play_mode {
                         NormalTurn => {
-                            println!("どうする?");
+                            print("どうする?")?;
                             let hands = hand_state.to_vec();
                             let play_mode = ();
                             let number = {
                                 loop {
-                                    println!("カードを選んでね");
+                                    print("カードを選んでね")?;
                                     let mut string = String::new();
                                     std::io::stdin().read_line(&mut string)?;
                                     let kouho = string.trim().parse::<u8>()?;
                                     if !hands.contains(&kouho) {
-                                        println!("そのカードは無いよ");
+                                        print("そのカードは無いよ")?;
                                     } else {
                                         break kouho;
                                     }
@@ -96,7 +96,7 @@ where
 {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
-    println!("{:?}", connection_start);
+    dbg!(&connection_start);
     Ok(connection_start.client_id)
 }
 
@@ -105,4 +105,10 @@ fn read_keybord() -> Result<String, io::Error> {
     std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
     Ok(response)
+}
+
+fn print(string: &str) -> io::Result<()> {
+    let mut stdout = std::io::stdout();
+    stdout.write_all(string.as_bytes())?;
+    stdout.flush()
 }
