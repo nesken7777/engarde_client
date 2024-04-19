@@ -2,17 +2,18 @@ mod protocol;
 use protocol::{
     BoardInfo, ConnectionStart, HandInfo, Messages, NameReceived, PlayerName, RequestedPlay,
 };
+mod errors;
+use errors::Errors;
 use serde::Serialize;
 use std::{
     error::Error,
-    fmt::Debug,
-    io::{stdout, BufRead, BufReader, BufWriter, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
 };
 use Messages::*;
 use RequestedPlay::*;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     let stream = TcpStream::connect(addr)?;
@@ -21,14 +22,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     connect(&mut bufreader)?;
     {
         // ここはどうする?標準入力にする?
-        println!("名前を入力");
-        let name=read_keybord();
-        println!("{}",name);
+        print("名前を入力")?;
+        let name = read_keybord()?;
+        print(format!("{}", name).as_str())?;
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let string = read_stream(&mut bufreader)?;
         let name_received = serde_json::from_str::<NameReceived>(&string)?;
-        println!("{:?}", name_received);
+        print(format!("{:?}", name_received).as_str())?;
     }
     {
         let mut board_state = BoardInfo::new();
@@ -43,17 +44,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let play_mode = RequestedPlay::from_id(do_play.message_id)?;
                     match play_mode {
                         NormalTurn => {
-                            println!("どうする?");
+                            print("どうする?")?;
                             let hands = hand_state.to_vec();
                             let play_mode = ();
                             let number = {
                                 loop {
-                                    println!("カードを選んでね");
+                                    print("カードを選んでね")?;
                                     let mut string = String::new();
                                     std::io::stdin().read_line(&mut string)?;
                                     let kouho = string.trim().parse::<u8>()?;
                                     if !hands.contains(&kouho) {
-                                        println!("そのカードは無いよ");
+                                        print("そのカードは無いよ")?;
                                     } else {
                                         break kouho;
                                     }
@@ -80,7 +81,7 @@ where
     Ok(string.trim().to_string())
 }
 
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Box<dyn Error>>
+fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
 where
     W: Write,
     T: Serialize,
@@ -91,29 +92,32 @@ where
     Ok(())
 }
 
-fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Box<dyn Error>>
+fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Errors>
 where
     T: Read,
 {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
-    println!("{:?}", connection_start);
+    dbg!(&connection_start);
     Ok(connection_start.client_id)
 }
 
-
-fn read_keybord()-> String{
+fn read_keybord() -> io::Result<String> {
     let mut word = String::new();
-    std::io::stdin().read_line(&mut word).ok();
+    std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
-    response
+    Ok(response)
 }
 
-fn permutation(n: u64, r: u64) -> u64 {
-    (n - r + 1..=n).product()
+fn print(string: &str) -> io::Result<()> {
+    let mut stdout = std::io::stdout();
+    stdout.write_all(string.as_bytes())?;
+    stdout.flush()
 }
+
 
 fn combination(n: u64, mut r: u64) -> u64{
     let perm = permutation(n, r);
     perm / (1..=r).product::<u64>()
 }
+
