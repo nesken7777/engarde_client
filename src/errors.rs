@@ -1,4 +1,4 @@
-use std::{error, fmt::Display, io, num::ParseIntError};
+use std::{fmt::Display, io, num::ParseIntError};
 use crate::protocol::{InvalidPlayId, ParseMessageError};
 
 #[derive(Debug)]
@@ -45,6 +45,6 @@ impl From<ParseIntError> for Errors {
 
 impl From<InvalidPlayId> for Errors {
     fn from(value: InvalidPlayId) -> Self {
-        InvalidPlayId(value)
+        Self::InvalidPlayId(value)
     }
 }
