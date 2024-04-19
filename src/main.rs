@@ -1,6 +1,7 @@
 mod protocol;
 use protocol::{
-    BoardInfo, ConnectionStart, HandInfo, Messages, NameReceived, PlayerName, RequestedPlay,
+    BoardInfo, ConnectionStart, Evaluation, HandInfo, Messages, NameReceived, PlayAttack,
+    PlayMovement, PlayerName, PlayerProperty,
 };
 mod errors;
 use errors::Errors;
@@ -12,15 +13,16 @@ use std::{
     vec,
 };
 use Messages::*;
-use RequestedPlay::*;
 mod algorithm;
+
 fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    connect(&mut bufreader)?;
+    let id = connect(&mut bufreader)?;
+    let mut my_info = PlayerProperty::new(id);
     {
         // ここはどうする?標準入力にする?
         print("名前を入力")?;
@@ -34,48 +36,133 @@ fn main() -> Result<(), Errors> {
     }
     {
         let mut board_state = BoardInfo::new();
-        let mut hand_state = HandInfo::new();
         let mut cards = vec![5, 5];
+
         loop {
-            match Messages::parse(&read_stream(&mut bufreader)?)? {
-                BoardInfo(board_info) => {
-                    board_state = board_info;
-                }
-                HandInfo(hand_info) => hand_state = hand_info,
-                DoPlay(do_play) => {
-                    let play_mode = RequestedPlay::from_id(do_play.message_id)?;
-                    match play_mode {
-                        NormalTurn => {
-                            print("どうする?")?;
-                            let hands = hand_state.to_vec();
-                            let play_mode = ();
-                            let number = {
-                                loop {
-                                    print("カードを選んでね")?;
-                                    let mut string = String::new();
-                                    std::io::stdin().read_line(&mut string)?;
-                                    let kouho = string.trim().parse::<u8>()?;
-                                    if !hands.contains(&kouho) {
-                                        print("そのカードは無いよ")?;
-                                    } else {
-                                        break kouho;
-                                    }
-                                }
-                            };
-                        }
-                        Parry => (),
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(messages) => match messages {
+                    BoardInfo(board_info) => {
+                        my_info.position = match my_info.id {
+                            0 => board_info.player_position_0,
+                            1 => board_info.player_position_1,
+                            _ => unreachable!(),
+                        };
+                        board_state = board_info;
                     }
+                    HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
+                    DoPlay(_) => {
+                        bufwriter.write_all(
+                            format!("{}\r\n", serde_json::to_string(&Evaluation::new())?)
+                                .as_bytes(),
+                        )?;
+                        bufwriter.flush()?;
+                        act(&my_info, &board_state, &mut bufwriter)?;
+                    }
+                    ServerError(_) => {
+                        print("エラーもらった")?;
+                        act(&my_info, &board_state, &mut bufwriter)?;
+                    }
+                    Played(played) => algorithm::used_card(&mut cards, played),
+                    RoundEnd(_round_end) => (),
+                    GameEnd(_game_end) => break,
+                },
+                Err(e) => {
+                    print("変なエラーもらった")?;
+                    print(format!("{}", e).as_str())?;
                 }
-                Played(played) => algorithm::used_card(&mut cards, played),
-                RoundEnd(round_end) => (),
-                GameEnd(game_end) => break,
             }
         }
     }
     Ok(())
 }
 
-fn read_stream<T>(bufreader: &mut BufReader<T>) -> Result<String, Box<dyn Error>>
+enum Direction {
+    Forward,
+    Back,
+}
+
+impl Direction {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Forward => "F".to_string(),
+            Self::Back => "B".to_string(),
+        }
+    }
+}
+
+enum Action {
+    Move { card: u8, direction: Direction },
+    Attack { card: u8, quantity: u8 },
+}
+
+fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Errors> {
+    let action_str = {
+        loop {
+            print("どっちのアクションにする?")?;
+            let string = read_keybord()?;
+            match string.as_str() {
+                "M" => break "M",
+                "A" => break "A",
+                _ => {
+                    print("その行動は無いよ")?;
+                }
+            }
+        }
+    };
+    match action_str {
+        "M" => {
+            let card = ask_card(&player)?;
+            let direction = loop {
+                print("どっち向きにする?")?;
+                let string = read_keybord()?;
+                match string.as_str() {
+                    "F" => break Direction::Forward,
+                    "B" => break Direction::Back,
+                    _ => {
+                        print("その方向は無いよ")?;
+                    }
+                }
+            };
+            Ok(Action::Move { card, direction })
+        }
+        "A" => {
+            let card = board.distance_between_enemy();
+            dbg!(card);
+            let quantity = {
+                print("何枚使う?")?;
+                read_keybord()?.parse::<u8>()?
+            };
+            Ok(Action::Attack { card, quantity })
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn act(
+    my_info: &PlayerProperty,
+    board_state: &BoardInfo,
+    bufwriter: &mut BufWriter<TcpStream>,
+) -> Result<(), Errors> {
+    let action = ask_action(my_info, board_state)?;
+    match action {
+        Action::Move { card, direction } => {
+            let json = serde_json::to_string(&PlayMovement::from_info(card, direction))?;
+            bufwriter.write_all(json.as_bytes())?;
+            bufwriter.write_all(b"\r\n")?;
+            bufwriter.flush()?;
+            dbg!();
+        }
+        Action::Attack { card, quantity } => {
+            let json = serde_json::to_string(&PlayAttack::from_info(card, quantity))?;
+            bufwriter.write_all(json.as_bytes())?;
+            bufwriter.write_all(b"\r\n")?;
+            bufwriter.flush()?;
+        }
+    }
+    Ok(())
+}
+
+fn read_stream<T>(bufreader: &mut BufReader<T>) -> io::Result<String>
 where
     T: Read,
 {
@@ -112,8 +199,22 @@ fn read_keybord() -> io::Result<String> {
     Ok(response)
 }
 
+fn ask_card(player: &PlayerProperty) -> Result<u8, Errors> {
+    loop {
+        print("カードはどれにする?")?;
+        let card = read_keybord()?.parse::<u8>()?;
+        if !player.hand.contains(&card) {
+            print("そのカードは無いよ")?;
+            continue;
+        } else {
+            break Ok(card);
+        }
+    }
+}
+
 fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();
     stdout.write_all(string.as_bytes())?;
+    stdout.write_all(b"\r\n")?;
     stdout.flush()
 }

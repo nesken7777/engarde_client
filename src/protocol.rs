@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::Value;
 
-use crate::errors::Errors;
+use crate::{errors::Errors, Direction};
 
 //ゲーム中に繰り返し受信されるJSON達
 // ConnectionStartとNameReceivedは最初しか来ないので除外
@@ -15,6 +15,7 @@ pub enum Messages {
     Played(Played),
     RoundEnd(RoundEnd),
     GameEnd(GameEnd),
+    ServerError(ServerError),
 }
 
 #[derive(Debug)]
@@ -45,6 +46,7 @@ impl Messages {
             "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
             "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
             "Played" => Ok(Self::Played(serde_json::from_value(obj)?)),
+            "Error" => Ok(Self::ServerError(serde_json::from_value(obj)?)),
             _ => Err(ParseMessageError {
                 invalid_info: json.to_string(),
             })?,
@@ -154,6 +156,18 @@ impl BoardInfo {
             current_player: 0,
         }
     }
+
+    pub fn distance_between_enemy(&self) -> u8 {
+        dbg!(&self);
+        (self.player_position_0 as i8 - self.player_position_1 as i8).abs() as u8
+    }
+
+    pub fn distance_from_middle(&self) -> (u8, u8) {
+        (
+            (12i8 - self.player_position_0 as i8).abs() as u8,
+            (12i8 - self.player_position_1 as i8).abs() as u8,
+        )
+    }
 }
 
 #[derive(Deserialize)]
@@ -208,12 +222,8 @@ pub struct DoPlay {
         deserialize_with = "deserialize_number_from_string"
     )]
     pub message_id: u8,
+    #[serde(rename = "Message")]
     message: String,
-}
-
-pub enum RequestedPlay {
-    NormalTurn,
-    Parry,
 }
 
 #[derive(Debug)]
@@ -226,16 +236,6 @@ impl Display for InvalidPlayId {
 }
 
 impl Error for InvalidPlayId {}
-
-impl RequestedPlay {
-    pub fn from_id(message_id: u8) -> Result<Self, InvalidPlayId> {
-        match message_id {
-            101 => Ok(Self::NormalTurn),
-            102 => Ok(Self::Parry),
-            _ => Err(InvalidPlayId),
-        }
-    }
-}
 
 #[derive(Serialize)]
 pub struct Evaluation {
@@ -266,6 +266,7 @@ pub struct Evaluation {
     #[serde(rename = "5B")]
     pub eval_5b: Option<String>,
 }
+
 #[derive(Deserialize)]
 pub struct Played {
     #[serde(rename = "Type")]
@@ -281,6 +282,27 @@ pub struct Played {
     #[serde(rename = "Direction")]
     pub direction: String,
 }
+
+impl Evaluation {
+    pub fn new() -> Self {
+        Self {
+            typ: "Evaluation".to_string(),
+            from: "Client".to_string(),
+            to: "Server".to_string(),
+            eval_1f: Some("1.0".to_string()),
+            eval_1b: Some("0.0".to_string()),
+            eval_2f: Some("0.0".to_string()),
+            eval_2b: Some("0.0".to_string()),
+            eval_3f: Some("0.0".to_string()),
+            eval_3b: Some("0.0".to_string()),
+            eval_4f: Some("0.0".to_string()),
+            eval_4b: Some("0.0".to_string()),
+            eval_5f: Some("0.0".to_string()),
+            eval_5b: Some("0.0".to_string()),
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub struct PlayMovement {
     #[serde(rename = "Type")]
@@ -295,6 +317,19 @@ pub struct PlayMovement {
     pub play_card: String,
     #[serde(rename = "Direction")]
     pub direction: String,
+}
+
+impl PlayMovement {
+    pub fn from_info(card: u8, direction: Direction) -> Self {
+        PlayMovement {
+            typ: "Play".to_string(),
+            from: "Client".to_string(),
+            to: "Server".to_string(),
+            message_id: "101".to_string(),
+            play_card: card.to_string(),
+            direction: direction.to_string(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -313,20 +348,17 @@ pub struct PlayAttack {
     pub num_of_card: String,
 }
 
-#[derive(Serialize)]
-pub struct PlayParry {
-    #[serde(rename = "Type")]
-    pub typ: String,
-    #[serde(rename = "From")]
-    pub from: String,
-    #[serde(rename = "To")]
-    pub to: String,
-    #[serde(rename = "MessageID")]
-    pub message_id: String,
-    #[serde(rename = "PlayCard")]
-    pub play_card: String,
-    #[serde(rename = "NumOfCard")]
-    pub num_of_card: String,
+impl PlayAttack {
+    pub fn from_info(card: u8, num_of_card: u8) -> Self {
+        Self {
+            typ: "Play".to_string(),
+            from: "Client".to_string(),
+            to: "Server".to_string(),
+            message_id: "102".to_string(),
+            play_card: card.to_string(),
+            num_of_card: num_of_card.to_string(),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -363,4 +395,35 @@ pub struct GameEnd {
     pub score_1: u8,
     #[serde(rename = "Message")]
     pub message: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename = "Error")]
+pub struct ServerError {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "Message")]
+    message: String,
+    #[serde(rename = "MessageID")]
+    message_id: String,
+}
+
+pub struct PlayerProperty {
+    pub id: u8,
+    pub hand: Vec<u8>,
+    pub position: u8,
+}
+
+impl PlayerProperty {
+    pub fn new(id: u8) -> Self {
+        Self {
+            id,
+            hand: vec![],
+            position: 0,
+        }
+    }
 }
