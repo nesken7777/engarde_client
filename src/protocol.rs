@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::Value;
 
+use crate::errors::Errors;
+
 //ゲーム中に繰り返し受信されるJSON達
 // ConnectionStartとNameReceivedは最初しか来ないので除外
 pub enum Messages {
@@ -15,33 +17,33 @@ pub enum Messages {
 }
 
 #[derive(Debug)]
-struct MessageParseError {
+pub struct ParseMessageError {
     invalid_info: String,
 }
 
-impl Display for MessageParseError {
+impl Display for ParseMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "MessageParseError, json is {}", self.invalid_info)
     }
 }
 
-impl Error for MessageParseError {}
+impl Error for ParseMessageError {}
 
 impl Messages {
-    pub fn parse(json: &str) -> Result<Messages, Box<dyn Error>> {
+    pub fn parse(json: &str) -> Result<Messages, Errors> {
         let obj = serde_json::from_str::<Value>(json)?;
         let typ = obj
             .get("Type")
-            .ok_or("Typeキー無し")?
+            .expect("Typeキー無し")
             .as_str()
-            .ok_or("Typeが文字列ではない")?;
+            .expect("Typeが文字列ではない");
         match typ {
             "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_value(obj)?)),
             "HandInfo" => Ok(Self::HandInfo(serde_json::from_value(obj)?)),
             "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
             "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
             "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
-            _ => Err(MessageParseError {
+            _ => Err(ParseMessageError {
                 invalid_info: json.to_string(),
             })?,
         }

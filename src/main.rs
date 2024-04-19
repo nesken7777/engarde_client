@@ -2,6 +2,8 @@ mod protocol;
 use protocol::{
     BoardInfo, ConnectionStart, HandInfo, Messages, NameReceived, PlayerName, RequestedPlay,
 };
+mod errors;
+use errors::Errors;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -11,7 +13,7 @@ use std::{
 use Messages::*;
 use RequestedPlay::*;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     let stream = TcpStream::connect(addr)?;
@@ -79,7 +81,7 @@ where
     Ok(string.trim().to_string())
 }
 
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Box<dyn Error>>
+fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
 where
     W: Write,
     T: Serialize,
@@ -90,7 +92,7 @@ where
     Ok(())
 }
 
-fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Box<dyn Error>>
+fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Errors>
 where
     T: Read,
 {
@@ -100,7 +102,7 @@ where
     Ok(connection_start.client_id)
 }
 
-fn read_keybord() -> Result<String, io::Error> {
+fn read_keybord() -> io::Result<String> {
     let mut word = String::new();
     std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
