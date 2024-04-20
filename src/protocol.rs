@@ -364,8 +364,11 @@ pub struct PlayedMoveMent {
     to: String,
     #[serde(rename = "MessageID")]
     pub message_id: String,
-    #[serde(rename = "PlayCard")]
-    pub play_card: String,
+    #[serde(
+        rename = "PlayCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub play_card: u8,
     #[serde(rename = "Direction")]
     pub direction: String,
 }
@@ -409,10 +412,16 @@ pub struct PlayedAttack {
     to: String,
     #[serde(rename = "MessageID")]
     pub message_id: String,
-    #[serde(rename = "PlayCard")]
-    pub play_card: String,
-    #[serde(rename = "NumOfCard")]
-    pub num_of_card: String,
+    #[serde(
+        rename = "PlayCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub play_card: u8,
+    #[serde(
+        rename = "NumOfCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub num_of_card: u8,
 }
 
 #[derive(Deserialize)]

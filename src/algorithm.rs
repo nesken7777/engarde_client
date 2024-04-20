@@ -10,8 +10,15 @@ pub fn combination(n: u64, r: u64) -> u64 {
 }
 
 pub fn used_card(cards: &mut [u64], message: Played) {
-    if let Ok(i) = message.play_card.parse::<usize>() {
-        cards[i] -= 1
+    match message {
+        Played::MoveMent(movement) => {
+            let i: usize = movement.play_card.into();
+            cards[i - 1] -= 1;
+        }
+        Played::Attack(attack) => {
+            let i: usize = attack.play_card.into();
+            cards[i - 1] -= 1;
+        }
     }
 }
 
