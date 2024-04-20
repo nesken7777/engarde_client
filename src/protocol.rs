@@ -11,11 +11,11 @@ pub enum Direction {
     Back,
 }
 
-impl Direction {
-    fn to_string(&self) -> String {
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Forward => "F".to_string(),
-            Self::Back => "B".to_string(),
+            Self::Forward => write!(f, "F"),
+            Self::Back => write!(f, "B"),
         }
     }
 }
@@ -208,13 +208,13 @@ impl BoardInfo {
     }
 
     pub fn distance_between_enemy(&self) -> u8 {
-        (self.player_position_0 as i8 - self.player_position_1 as i8).abs() as u8
+        (self.player_position_0 as i8 - self.player_position_1 as i8).unsigned_abs()
     }
 
     pub fn distance_from_middle(&self) -> (u8, u8) {
         (
-            (12i8 - self.player_position_0 as i8).abs() as u8,
-            (12i8 - self.player_position_1 as i8).abs() as u8,
+            (12i8 - self.player_position_0 as i8).unsigned_abs(),
+            (12i8 - self.player_position_1 as i8).unsigned_abs(),
         )
     }
 }
