@@ -48,7 +48,10 @@ where
 fn ask_card(player: &PlayerProperty) -> Result<u8, Errors> {
     loop {
         print("カードはどれにする?")?;
-        let card = read_keybord()?.parse::<u8>()?;
+        let Ok(card) = read_keybord()?.parse::<u8>() else {
+            print("それ数字じゃないだろ")?;
+            continue;
+        };
         if !player.hand.contains(&card) {
             print("そのカードは無いよ")?;
             continue;
@@ -89,6 +92,7 @@ enum Action {
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Errors> {
+    print(format!("手札:{:?}", player.hand).as_str())?;
     let action_str = {
         loop {
             print("どっちのアクションにする?")?;
@@ -120,7 +124,6 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Erro
         }
         "A" => {
             let card = board.distance_between_enemy();
-            dbg!(card);
             let quantity = {
                 print("何枚使う?")?;
                 read_keybord()?.parse::<u8>()?
@@ -161,12 +164,9 @@ fn main() -> Result<(), Errors> {
         // ここはどうする?標準入力にする?
         print("名前を入力")?;
         let name = read_keybord()?;
-        print(name.as_str())?;
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
-        let string = read_stream(&mut bufreader)?;
-        let name_received = serde_json::from_str::<NameReceived>(&string)?;
-        print(format!("{:?}", name_received).as_str())?;
+        let _ = read_stream(&mut bufreader)?;
     }
     {
         let mut board_state = BoardInfo::new();
@@ -193,8 +193,12 @@ fn main() -> Result<(), Errors> {
                         act(&my_info, &board_state, &mut bufwriter)?;
                     }
                     Played(played) => algorithm::used_card(&mut cards, played),
-                    RoundEnd(_round_end) => (),
-                    GameEnd(_game_end) => break,
+                    RoundEnd(_round_end) => {
+                        print("ラウンド終わり!")?;
+                    }
+                    GameEnd(_game_end) => {
+                        break;
+                    }
                 },
                 Err(e) => {
                     print("JSON解析できなかった")?;
