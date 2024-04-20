@@ -1,11 +1,11 @@
-mod protocol;
-mod errors;
 mod algorithm;
-use protocol::{
-    BoardInfo, ConnectionStart, Evaluation, Messages, NameReceived, PlayAttack,
-    PlayMovement, PlayerName, PlayerProperty,
-};
+mod errors;
+mod protocol;
 use errors::Errors;
+use protocol::{
+    Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
+    PlayAttack, PlayMovement, PlayerName, PlayerProperty,
+};
 use serde::Serialize;
 use std::{
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
@@ -72,25 +72,6 @@ where
     Ok(())
 }
 
-enum Direction {
-    Forward,
-    Back,
-}
-
-impl Direction {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Forward => "F".to_string(),
-            Self::Back => "B".to_string(),
-        }
-    }
-}
-
-enum Action {
-    Move { card: u8, direction: Direction },
-    Attack { card: u8, quantity: u8 },
-}
-
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Errors> {
     print(format!("手札:{:?}", player.hand).as_str())?;
     let action_str = {
@@ -120,7 +101,7 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Erro
                     }
                 }
             };
-            Ok(Action::Move { card, direction })
+            Ok(Action::Move(Movement { card, direction }))
         }
         "A" => {
             let card = board.distance_between_enemy();
@@ -128,7 +109,7 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Erro
                 print("何枚使う?")?;
                 read_keybord()?.parse::<u8>()?
             };
-            Ok(Action::Attack { card, quantity })
+            Ok(Action::Attack(Attack { card, quantity }))
         }
         _ => unreachable!(),
     }
@@ -141,12 +122,11 @@ fn act(
 ) -> Result<(), Errors> {
     let action = ask_action(my_info, board_state)?;
     match action {
-        Action::Move { card, direction } => {
-            send_info(bufwriter, &PlayMovement::from_info(card, direction))?;
-            dbg!();
+        Action::Move(movement) => {
+            send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
-        Action::Attack { card, quantity } => {
-            send_info(bufwriter, &PlayAttack::from_info(card, quantity))?;
+        Action::Attack(attack) => {
+            send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }
     Ok(())
@@ -184,6 +164,7 @@ fn main() -> Result<(), Errors> {
                         board_state = board_info;
                     }
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
+                    Accept(_) => (),
                     DoPlay(_) => {
                         send_info(&mut bufwriter, &Evaluation::new())?;
                         act(&my_info, &board_state, &mut bufwriter)?;
