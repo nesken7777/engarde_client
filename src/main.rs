@@ -10,7 +10,6 @@ use serde::Serialize;
 use std::{
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
-    vec,
 };
 use Messages::*;
 
@@ -43,7 +42,6 @@ where
 {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
-    dbg!(&connection_start);
     Ok(connection_start.client_id)
 }
 
@@ -199,7 +197,7 @@ fn main() -> Result<(), Errors> {
                     GameEnd(_game_end) => break,
                 },
                 Err(e) => {
-                    print("変なエラーもらった")?;
+                    print("JSON解析できなかった")?;
                     print(format!("{}", e).as_str())?;
                 }
             }
