@@ -170,7 +170,7 @@ fn main() -> Result<(), Errors> {
     }
     {
         let mut board_state = BoardInfo::new();
-        let mut cards = vec![5, 5];
+        let mut cards = vec![5; 5];
 
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
