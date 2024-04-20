@@ -226,17 +226,6 @@ pub struct DoPlay {
     message: String,
 }
 
-#[derive(Debug)]
-pub struct InvalidPlayId;
-
-impl Display for InvalidPlayId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InvalidPlayId")
-    }
-}
-
-impl Error for InvalidPlayId {}
-
 #[derive(Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
