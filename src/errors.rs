@@ -1,4 +1,4 @@
-use crate::protocol::{InvalidPlayId, ParseMessageError};
+use crate::protocol::ParseMessageError;
 use std::{fmt::Display, io, num::ParseIntError};
 
 #[derive(Debug)]
@@ -7,15 +7,21 @@ pub enum Errors {
     MessageParse(ParseMessageError),
     ParseInt(ParseIntError),
     Serde(serde_json::Error),
-    InvalidPlayId(InvalidPlayId),
+    Other(&'static str),
 }
 
 use Errors::*;
 
-// どう考えても見ずらい表示するはずなので後で変える
 impl Display for Errors {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        const ERROR_MESSAGE: &str = "エラー発生した:";
+        match self {
+            IO(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+            MessageParse(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+            ParseInt(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+            Serde(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+            Other(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+        }
     }
 }
 
@@ -43,8 +49,8 @@ impl From<ParseIntError> for Errors {
     }
 }
 
-impl From<InvalidPlayId> for Errors {
-    fn from(value: InvalidPlayId) -> Self {
-        Self::InvalidPlayId(value)
+impl From<&'static str> for Errors {
+    fn from(value: &'static str) -> Self {
+        Self::Other(value)
     }
 }

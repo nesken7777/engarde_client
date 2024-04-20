@@ -36,9 +36,9 @@ impl Messages {
         let obj = serde_json::from_str::<Value>(json)?;
         let typ = obj
             .get("Type")
-            .expect("Typeキー無し")
+            .ok_or("Typeキー無し")?
             .as_str()
-            .expect("Typeが文字列ではない");
+            .ok_or("Typeが文字列ではない")?;
         match typ {
             "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_value(obj)?)),
             "HandInfo" => Ok(Self::HandInfo(serde_json::from_value(obj)?)),
