@@ -6,151 +6,6 @@ use serde_json::Value;
 
 use crate::errors::Errors;
 
-pub enum Direction {
-    Forward,
-    Back,
-}
-
-impl Display for Direction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Forward => write!(f, "F"),
-            Self::Back => write!(f, "B"),
-        }
-    }
-}
-
-pub struct Movement {
-    pub card: u8,
-    pub direction: Direction,
-}
-
-pub struct Attack {
-    pub card: u8,
-    pub quantity: u8,
-}
-
-pub enum Action {
-    Move(Movement),
-    Attack(Attack),
-}
-
-pub enum Played {
-    MoveMent(PlayedMoveMent),
-    Attack(PlayedAttack),
-}
-
-//ゲーム中に繰り返し受信されるJSON達
-// ConnectionStartとNameReceivedは最初しか来ないので除外
-pub enum Messages {
-    BoardInfo(BoardInfo),
-    HandInfo(HandInfo),
-    DoPlay(DoPlay),
-    Accept(Accept),
-    Played(Played),
-    RoundEnd(RoundEnd),
-    GameEnd(GameEnd),
-    ServerError(ServerError),
-}
-
-#[derive(Debug)]
-pub struct ParseMessageError {
-    invalid_info: String,
-}
-
-impl Display for ParseMessageError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MessageParseError, json is {}", self.invalid_info)
-    }
-}
-
-impl Error for ParseMessageError {}
-
-impl Messages {
-    pub fn parse(json: &str) -> Result<Messages, Errors> {
-        let obj = serde_json::from_str::<Value>(json)?;
-        let typ = obj
-            .get("Type")
-            .ok_or("Typeキー無し")?
-            .as_str()
-            .ok_or("Typeが文字列ではない")?;
-        match typ {
-            "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_str(json)?)),
-            "HandInfo" => Ok(Self::HandInfo(serde_json::from_str(json)?)),
-            "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
-            "Accept" => Ok(Self::Accept(serde_json::from_value(obj)?)),
-            "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
-            "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
-            "Played" => {
-                let message_id = obj
-                    .get("MessageID")
-                    .ok_or("MessageID無し")?
-                    .as_str()
-                    .ok_or("MessageIDが文字列ではない")?;
-                match message_id {
-                    "101" => Ok(Self::Played(Played::MoveMent(serde_json::from_value(obj)?))),
-                    "102" => Ok(Self::Played(Played::Attack(serde_json::from_value(obj)?))),
-                    _ => Err(ParseMessageError {
-                        invalid_info: json.to_string(),
-                    })?,
-                }
-            }
-            "Error" => Ok(Self::ServerError(serde_json::from_value(obj)?)),
-            _ => Err(ParseMessageError {
-                invalid_info: json.to_string(),
-            })?,
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ConnectionStart {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(
-        rename = "ClientID",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub client_id: u8,
-}
-
-#[derive(Serialize)]
-pub struct PlayerName {
-    #[serde(rename = "Type")]
-    pub typ: String,
-    #[serde(rename = "From")]
-    pub from: String,
-    #[serde(rename = "To")]
-    pub to: String,
-    #[serde(rename = "Name")]
-    pub name: String,
-}
-
-impl PlayerName {
-    pub fn new(name: String) -> Self {
-        PlayerName {
-            typ: "PlayerName".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
-            name,
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct NameReceived {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-}
-
 #[derive(Deserialize, Debug)]
 pub struct BoardInfo {
     #[serde(rename = "Type")]
@@ -275,6 +130,258 @@ pub struct DoPlay {
     message: String,
 }
 
+#[derive(Deserialize)]
+pub struct Accept {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "MessageID")]
+    message_id: String,
+}
+
+pub enum Direction {
+    Forward,
+    Back,
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Forward => write!(f, "F"),
+            Self::Back => write!(f, "B"),
+        }
+    }
+}
+
+pub struct Movement {
+    pub card: u8,
+    pub direction: Direction,
+}
+
+pub struct Attack {
+    pub card: u8,
+    pub quantity: u8,
+}
+
+pub enum Action {
+    Move(Movement),
+    Attack(Attack),
+}
+
+#[derive(Deserialize)]
+pub struct PlayedMoveMent {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "MessageID")]
+    pub message_id: String,
+    #[serde(
+        rename = "PlayCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub play_card: u8,
+    #[serde(rename = "Direction")]
+    pub direction: String,
+}
+
+#[derive(Deserialize)]
+pub struct PlayedAttack {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "MessageID")]
+    pub message_id: String,
+    #[serde(
+        rename = "PlayCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub play_card: u8,
+    #[serde(
+        rename = "NumOfCard",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub num_of_card: u8,
+}
+
+pub enum Played {
+    MoveMent(PlayedMoveMent),
+    Attack(PlayedAttack),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RoundEnd {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(
+        rename = "RWinner",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub round_winner: i8,
+    #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
+    pub score_0: u8,
+    #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
+    pub score_1: u8,
+    #[serde(rename = "Message")]
+    pub message: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GameEnd {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
+    pub winner: u8,
+    #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
+    pub score_0: u8,
+    #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
+    pub score_1: u8,
+    #[serde(rename = "Message")]
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename = "Error")]
+pub struct ServerError {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(rename = "Message")]
+    message: String,
+    #[serde(rename = "MessageID")]
+    message_id: String,
+}
+
+//ゲーム中に繰り返し受信されるJSON達
+// ConnectionStartとNameReceivedは最初しか来ないので除外
+pub enum Messages {
+    BoardInfo(BoardInfo),
+    HandInfo(HandInfo),
+    DoPlay(DoPlay),
+    Accept(Accept),
+    Played(Played),
+    RoundEnd(RoundEnd),
+    GameEnd(GameEnd),
+    ServerError(ServerError),
+}
+
+#[derive(Debug)]
+pub struct ParseMessageError {
+    invalid_info: String,
+}
+
+impl Display for ParseMessageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MessageParseError, json is {}", self.invalid_info)
+    }
+}
+
+impl Error for ParseMessageError {}
+
+impl Messages {
+    pub fn parse(json: &str) -> Result<Messages, Errors> {
+        let obj = serde_json::from_str::<Value>(json)?;
+        let typ = obj
+            .get("Type")
+            .ok_or("Typeキー無し")?
+            .as_str()
+            .ok_or("Typeが文字列ではない")?;
+        match typ {
+            "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_str(json)?)),
+            "HandInfo" => Ok(Self::HandInfo(serde_json::from_str(json)?)),
+            "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
+            "Accept" => Ok(Self::Accept(serde_json::from_value(obj)?)),
+            "RoundEnd" => Ok(Self::RoundEnd(serde_json::from_value(obj)?)),
+            "GameEnd" => Ok(Self::GameEnd(serde_json::from_value(obj)?)),
+            "Played" => {
+                let message_id = obj
+                    .get("MessageID")
+                    .ok_or("MessageID無し")?
+                    .as_str()
+                    .ok_or("MessageIDが文字列ではない")?;
+                match message_id {
+                    "101" => Ok(Self::Played(Played::MoveMent(serde_json::from_value(obj)?))),
+                    "102" => Ok(Self::Played(Played::Attack(serde_json::from_value(obj)?))),
+                    _ => Err(ParseMessageError {
+                        invalid_info: json.to_string(),
+                    })?,
+                }
+            }
+            "Error" => Ok(Self::ServerError(serde_json::from_value(obj)?)),
+            _ => Err(ParseMessageError {
+                invalid_info: json.to_string(),
+            })?,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ConnectionStart {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+    #[serde(
+        rename = "ClientID",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    pub client_id: u8,
+}
+
+#[derive(Serialize)]
+pub struct PlayerName {
+    #[serde(rename = "Type")]
+    pub typ: String,
+    #[serde(rename = "From")]
+    pub from: String,
+    #[serde(rename = "To")]
+    pub to: String,
+    #[serde(rename = "Name")]
+    pub name: String,
+}
+
+impl PlayerName {
+    pub fn new(name: String) -> Self {
+        PlayerName {
+            typ: "PlayerName".to_string(),
+            from: "Client".to_string(),
+            to: "Server".to_string(),
+            name,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NameReceived {
+    #[serde(rename = "Type")]
+    typ: String,
+    #[serde(rename = "From")]
+    from: String,
+    #[serde(rename = "To")]
+    to: String,
+}
+
 #[derive(Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
@@ -354,25 +461,6 @@ impl PlayMovement {
     }
 }
 
-#[derive(Deserialize)]
-pub struct PlayedMoveMent {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(rename = "MessageID")]
-    pub message_id: String,
-    #[serde(
-        rename = "PlayCard",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub play_card: u8,
-    #[serde(rename = "Direction")]
-    pub direction: String,
-}
-
 #[derive(Serialize)]
 pub struct PlayAttack {
     #[serde(rename = "Type")]
@@ -400,94 +488,6 @@ impl PlayAttack {
             num_of_card: info.quantity.to_string(),
         }
     }
-}
-
-#[derive(Deserialize)]
-pub struct PlayedAttack {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(rename = "MessageID")]
-    pub message_id: String,
-    #[serde(
-        rename = "PlayCard",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub play_card: u8,
-    #[serde(
-        rename = "NumOfCard",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub num_of_card: u8,
-}
-
-#[derive(Deserialize)]
-pub struct Accept {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(rename = "MessageID")]
-    message_id: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct RoundEnd {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(
-        rename = "RWinner",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub round_winner: i8,
-    #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
-    #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
-    #[serde(rename = "Message")]
-    pub message: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GameEnd {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
-    pub winner: u8,
-    #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
-    #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
-    #[serde(rename = "Message")]
-    pub message: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename = "Error")]
-pub struct ServerError {
-    #[serde(rename = "Type")]
-    typ: String,
-    #[serde(rename = "From")]
-    from: String,
-    #[serde(rename = "To")]
-    to: String,
-    #[serde(rename = "Message")]
-    message: String,
-    #[serde(rename = "MessageID")]
-    message_id: String,
 }
 
 pub struct PlayerProperty {
