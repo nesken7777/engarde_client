@@ -3,6 +3,7 @@ use std::{error::Error, fmt::Display};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::Value;
+use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
@@ -382,6 +383,7 @@ pub struct NameReceived {
     to: String,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
@@ -419,15 +421,15 @@ impl Evaluation {
             from: "Client".to_string(),
             to: "Server".to_string(),
             eval_1f: Some("1.0".to_string()),
-            eval_1b: Some("0.0".to_string()),
-            eval_2f: Some("0.0".to_string()),
-            eval_2b: Some("0.0".to_string()),
-            eval_3f: Some("0.0".to_string()),
-            eval_3b: Some("0.0".to_string()),
-            eval_4f: Some("0.0".to_string()),
-            eval_4b: Some("0.0".to_string()),
-            eval_5f: Some("0.0".to_string()),
-            eval_5b: Some("0.0".to_string()),
+            eval_1b: None,
+            eval_2f: None,
+            eval_2b: None,
+            eval_3f: None,
+            eval_3b: None,
+            eval_4f: None,
+            eval_4b: None,
+            eval_5f: None,
+            eval_5b: None,
         }
     }
 }
