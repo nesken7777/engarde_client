@@ -45,7 +45,18 @@ where
     Ok(connection_start.client_id)
 }
 
-fn ask_card(player: &PlayerProperty) -> Result<u8, Errors> {
+fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
+where
+    W: Write,
+    T: Serialize,
+{
+    let string = format!("{}\r\n", serde_json::to_string(info)?);
+    writer.write_all(string.as_bytes())?;
+    writer.flush()?;
+    Ok(())
+}
+
+fn ask_card(player: &PlayerProperty) -> io::Result<u8> {
     loop {
         print("カードはどれにする?")?;
         let Ok(card) = read_keybord()?.parse::<u8>() else {
@@ -61,57 +72,77 @@ fn ask_card(player: &PlayerProperty) -> Result<u8, Errors> {
     }
 }
 
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
-where
-    W: Write,
-    T: Serialize,
-{
-    let string = format!("{}\r\n", serde_json::to_string(info)?);
-    writer.write_all(string.as_bytes())?;
-    writer.flush()?;
-    Ok(())
-}
-
-fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Errors> {
-    print(format!("手札:{:?}", player.hand).as_str())?;
-    let action_str = {
-        loop {
-            print("どっちのアクションにする?")?;
-            let string = read_keybord()?;
-            match string.as_str() {
-                "M" => break "M",
-                "A" => break "A",
-                _ => {
-                    print("その行動は無いよ")?;
-                }
+fn ask_movement(player: &PlayerProperty) -> io::Result<Action> {
+    let card = ask_card(player)?;
+    let direction = loop {
+        print("どっち向きにする?")?;
+        let string = read_keybord()?;
+        match string.as_str() {
+            "F" => break Direction::Forward,
+            "B" => break Direction::Back,
+            _ => {
+                print("その方向は無いよ")?;
             }
         }
     };
-    match action_str {
-        "M" => {
-            let card = ask_card(player)?;
-            let direction = loop {
-                print("どっち向きにする?")?;
-                let string = read_keybord()?;
-                match string.as_str() {
-                    "F" => break Direction::Forward,
-                    "B" => break Direction::Back,
-                    _ => {
-                        print("その方向は無いよ")?;
+    Ok(Action::Move(Movement { card, direction }))
+}
+
+enum CantAttack {
+    IO(io::Error),
+    Lack,
+}
+
+impl From<io::Error> for CantAttack {
+    fn from(value: io::Error) -> Self {
+        Self::IO(value)
+    }
+}
+
+fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, CantAttack> {
+    use CantAttack::*;
+    let card = board.distance_between_enemy();
+    let have = player.hand.iter().filter(|&&x| x == card).count() as u8;
+    if have == 0 {
+        return Err(Lack);
+    }
+    let quantity = {
+        loop {
+            print("何枚使う?")?;
+            let Ok(quantity) = read_keybord()?.parse::<u8>() else {
+                print("それ数字じゃないですよ")?;
+                continue;
+            };
+            if quantity <= have {
+                break quantity;
+            } else {
+                print("そんなにたくさん持っていないですよ")?;
+            }
+        }
+    };
+    Ok(Action::Attack(Attack { card, quantity }))
+}
+
+fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
+    print(format!("手札:{:?}", player.hand).as_str())?;
+    loop {
+        print("どっちのアクションにする?")?;
+        let string = read_keybord()?;
+        match string.as_str() {
+            "M" => break ask_movement(player),
+            "A" => match ask_attack(player, board) {
+                Ok(attack) => break Ok(attack),
+                Err(e) => match e {
+                    CantAttack::IO(e) => break Err(e),
+                    CantAttack::Lack => {
+                        print("アタックはできないよ")?;
                     }
-                }
-            };
-            Ok(Action::Move(Movement { card, direction }))
+                },
+            },
+            _ => {
+                print("その行動は無いよ")?;
+            }
         }
-        "A" => {
-            let card = board.distance_between_enemy();
-            let quantity = {
-                print("何枚使う?")?;
-                read_keybord()?.parse::<u8>()?
-            };
-            Ok(Action::Attack(Attack { card, quantity }))
-        }
-        _ => unreachable!(),
     }
 }
 
