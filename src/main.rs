@@ -151,6 +151,8 @@ fn act(
     board_state: &BoardInfo,
     bufwriter: &mut BufWriter<TcpStream>,
 ) -> Result<(), Errors> {
+    let evaluation = Evaluation::new();
+    send_info(bufwriter, &evaluation)?;
     let action = ask_action(my_info, board_state)?;
     match action {
         Action::Move(movement) => {
@@ -196,10 +198,7 @@ fn main() -> Result<(), Errors> {
                     }
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
                     Accept(_) => (),
-                    DoPlay(_) => {
-                        send_info(&mut bufwriter, &Evaluation::new())?;
-                        act(&my_info, &board_state, &mut bufwriter)?;
-                    }
+                    DoPlay(_) => act(&my_info, &board_state, &mut bufwriter)?,
                     ServerError(_) => {
                         print("エラーもらった")?;
                         act(&my_info, &board_state, &mut bufwriter)?;
