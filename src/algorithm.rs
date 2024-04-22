@@ -1,54 +1,75 @@
 use num_rational::Ratio;
 
-use crate::protocol::Played;
+use crate::protocol::{BoardInfo, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = 5;
 
+#[derive(Debug)]
 pub struct ProbabilityTable {
-    hand1: [Ratio<u64>; 6],
-    hand2: [Ratio<u64>; 6],
-    hand3: [Ratio<u64>; 6],
-    hand4: [Ratio<u64>; 6],
-    hand5: [Ratio<u64>; 6],
+    card1: [Ratio<u64>; 6],
+    card2: [Ratio<u64>; 6],
+    card3: [Ratio<u64>; 6],
+    card4: [Ratio<u64>; 6],
+    card5: [Ratio<u64>; 6],
 }
 
 impl ProbabilityTable {
-    fn new() -> Self {
+    pub fn new() -> Self {
         const DEFAULT: Ratio<u64> = Ratio::<u64>::new_raw(1, 30);
         ProbabilityTable {
-            hand1: [DEFAULT; 6],
-            hand2: [DEFAULT; 6],
-            hand3: [DEFAULT; 6],
-            hand4: [DEFAULT; 6],
-            hand5: [DEFAULT; 6],
+            card1: [DEFAULT; 6],
+            card2: [DEFAULT; 6],
+            card3: [DEFAULT; 6],
+            card4: [DEFAULT; 6],
+            card5: [DEFAULT; 6],
         }
     }
 
     fn hand(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
         match i {
-            1 => Some(self.hand1),
-            2 => Some(self.hand2),
-            3 => Some(self.hand3),
-            4 => Some(self.hand4),
-            5 => Some(self.hand5),
+            1 => Some(self.card1),
+            2 => Some(self.card2),
+            3 => Some(self.card3),
+            4 => Some(self.card4),
+            5 => Some(self.card5),
             _ => None,
         }
     }
 
     fn access(&self, hand: u8, quantity: usize) -> Option<Ratio<u64>> {
         match hand {
-            1 => self.hand1.get(quantity).copied(),
-            2 => self.hand2.get(quantity).copied(),
-            3 => self.hand3.get(quantity).copied(),
-            4 => self.hand4.get(quantity).copied(),
-            5 => self.hand5.get(quantity).copied(),
+            1 => self.card1.get(quantity).copied(),
+            2 => self.card2.get(quantity).copied(),
+            3 => self.card3.get(quantity).copied(),
+            4 => self.card4.get(quantity).copied(),
+            5 => self.card5.get(quantity).copied(),
             _ => None,
+        }
+    }
+
+    pub fn update(&mut self, board: &BoardInfo, cards: &[u8]) {
+        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
+        self.card1 = probability(cards[0], total_unvisible_cards);
+        self.card2 = probability(cards[1], total_unvisible_cards);
+        self.card3 = probability(cards[2], total_unvisible_cards);
+        self.card4 = probability(cards[3], total_unvisible_cards);
+        self.card5 = probability(cards[4], total_unvisible_cards);
+    }
+
+    fn update_copy(board: &BoardInfo, cards: &[u8]) -> Self {
+        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
+        Self {
+            card1: probability(cards[0], total_unvisible_cards),
+            card2: probability(cards[1], total_unvisible_cards),
+            card3: probability(cards[2], total_unvisible_cards),
+            card4: probability(cards[3], total_unvisible_cards),
+            card5: probability(cards[4], total_unvisible_cards),
         }
     }
 }
 
-pub fn permutation(n: u64, r: u64) -> u64 {
+fn permutation(n: u64, r: u64) -> u64 {
     if n < r {
         0
     } else {
@@ -56,7 +77,7 @@ pub fn permutation(n: u64, r: u64) -> u64 {
     }
 }
 
-pub fn combination(n: u64, r: u64) -> u64 {
+fn combination(n: u64, r: u64) -> u64 {
     let perm = permutation(n, r);
     perm / (1..=r).product::<u64>()
 }
@@ -75,10 +96,10 @@ pub fn used_card(cards: &mut [u8], message: Played) {
 }
 
 /// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にi枚ある確率のリスト(添え字i)
-fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> Vec<Ratio<u64>> {
+fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<u64>; 6] {
     let target_unvisible_cards: u64 = target_unvisible_cards.into();
     let total_unvisible_cards: u64 = total_unvisible_cards.into();
-    (0..=target_unvisible_cards)
+    (0..=HANDS_DEFAULT_U64)
         .map(|r| {
             Ratio::from_integer(
                 combination(HANDS_DEFAULT_U64, r)
@@ -89,7 +110,9 @@ fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> Vec<Rat
                     ),
             ) / permutation(total_unvisible_cards, HANDS_DEFAULT_U64)
         })
-        .collect()
+        .collect::<Vec<Ratio<u64>>>()
+        .try_into()
+        .unwrap()
 }
 
 // pub fn safe_possibility(not_bochi: &[u64], hands: &[u64]) -> [u64; 5] {

@@ -1,6 +1,7 @@
 mod algorithm;
 mod errors;
 mod protocol;
+use algorithm::ProbabilityTable;
 use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
@@ -147,6 +148,8 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> 
 }
 
 fn act(
+    prob_table: &mut ProbabilityTable,
+    cards: &mut [u8],
     my_info: &PlayerProperty,
     board_state: &BoardInfo,
     bufwriter: &mut BufWriter<TcpStream>,
@@ -156,9 +159,12 @@ fn act(
     let action = ask_action(my_info, board_state)?;
     match action {
         Action::Move(movement) => {
+            cards[(movement.card - 1) as usize] -= 1;
             send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
+            cards[(attack.card - 1) as usize] =
+                cards[(attack.card - 1) as usize].saturating_sub(attack.quantity * 2);
             send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }
@@ -183,12 +189,13 @@ fn main() -> Result<(), Errors> {
     }
     {
         let mut board_state = BoardInfo::new();
-        let mut cards = vec![5; 5];
-
+        let mut cards = [5; 5];
+        let mut prob_table = ProbabilityTable::new();
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
                     BoardInfo(board_info) => {
+                        prob_table.update(&board_info, &cards);
                         my_info.position = match my_info.id {
                             0 => board_info.player_position_0,
                             1 => board_info.player_position_1,
@@ -198,14 +205,27 @@ fn main() -> Result<(), Errors> {
                     }
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
                     Accept(_) => (),
-                    DoPlay(_) => act(&my_info, &board_state, &mut bufwriter)?,
+                    DoPlay(_) => act(
+                        &mut prob_table,
+                        &mut cards,
+                        &my_info,
+                        &board_state,
+                        &mut bufwriter,
+                    )?,
                     ServerError(_) => {
                         print("エラーもらった")?;
-                        act(&my_info, &board_state, &mut bufwriter)?;
+                        act(
+                            &mut prob_table,
+                            &mut cards,
+                            &my_info,
+                            &board_state,
+                            &mut bufwriter,
+                        )?;
                     }
                     Played(played) => algorithm::used_card(&mut cards, played),
                     RoundEnd(_round_end) => {
                         print("ラウンド終わり!")?;
+                        cards = [5; 5];
                     }
                     GameEnd(_game_end) => {
                         break;
