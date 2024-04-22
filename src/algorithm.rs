@@ -1,4 +1,9 @@
+use num_rational::Ratio;
+
 use crate::protocol::Played;
+
+const HANDS_DEFAULT_U8: u8 = 5;
+const HANDS_DEFAULT_U64: u64 = 5;
 
 pub fn permutation(n: u64, r: u64) -> u64 {
     (n - r + 1..=n).product()
@@ -22,16 +27,23 @@ pub fn used_card(cards: &mut [u8], message: Played) {
     }
 }
 
-/// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にmin_cards_in_enemy_hand枚以上ある確率
-fn probability(min_cards_in_enemy_hand: u8, target_unvisible_cards: u8, total_unvisible_cards: u8) -> f64 {
-    let min_cards_in_enemy_hand: u64 = min_cards_in_enemy_hand.into();
+/// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にi枚ある確率のリスト(添え字i)
+fn probability(
+    target_unvisible_cards: u8,
+    total_unvisible_cards: u8,
+) -> Vec<Ratio<u64>> {
     let target_unvisible_cards: u64 = target_unvisible_cards.into();
     let total_unvisible_cards: u64 = total_unvisible_cards.into();
-    let mut n = target_unvisible_cards;
-    let mut probability: f64 = 0.0;
-    while n >= min_cards_in_enemy_hand {
-        probability += (combination(5,n) * permutation(target_unvisible_cards,n) * permutation(total_unvisible_cards-target_unvisible_cards,5-n)) as f64 / (permutation(total_unvisible_cards,5)) as f64;
-        n -= 1;
-    }
-    probability
+    (0..=target_unvisible_cards)
+        .map(|r| {
+            Ratio::from_integer(
+                combination(HANDS_DEFAULT_U64, r)
+                    * permutation(target_unvisible_cards, r)
+                    * permutation(
+                        total_unvisible_cards - target_unvisible_cards,
+                        HANDS_DEFAULT_U64 - r,
+                    ),
+            ) / permutation(total_unvisible_cards, HANDS_DEFAULT_U64)
+        })
+        .collect()
 }
