@@ -15,13 +15,13 @@ pub struct ProbabilityTable {
 
 impl ProbabilityTable {
     fn new() -> Self {
-        let default = Ratio::<u64>::new(1, 30);
+        const DEFAULT: Ratio<u64> = Ratio::<u64>::new_raw(1, 30);
         ProbabilityTable {
-            hand1: [default; 6],
-            hand2: [default; 6],
-            hand3: [default; 6],
-            hand4: [default; 6],
-            hand5: [default; 6],
+            hand1: [DEFAULT; 6],
+            hand2: [DEFAULT; 6],
+            hand3: [DEFAULT; 6],
+            hand4: [DEFAULT; 6],
+            hand5: [DEFAULT; 6],
         }
     }
 
@@ -38,18 +38,22 @@ impl ProbabilityTable {
 
     fn access(&self, hand: u8, quantity: usize) -> Option<Ratio<u64>> {
         match hand {
-            1 => self.hand1.get(quantity).map(|&x| x),
-            2 => self.hand2.get(quantity).map(|&x| x),
-            3 => self.hand3.get(quantity).map(|&x| x),
-            4 => self.hand4.get(quantity).map(|&x| x),
-            5 => self.hand5.get(quantity).map(|&x| x),
+            1 => self.hand1.get(quantity).copied(),
+            2 => self.hand2.get(quantity).copied(),
+            3 => self.hand3.get(quantity).copied(),
+            4 => self.hand4.get(quantity).copied(),
+            5 => self.hand5.get(quantity).copied(),
             _ => None,
         }
     }
 }
 
 pub fn permutation(n: u64, r: u64) -> u64 {
-    (n - r + 1..=n).product()
+    if n < r {
+        0
+    } else {
+        (n - r + 1..=n).product()
+    }
 }
 
 pub fn combination(n: u64, r: u64) -> u64 {
