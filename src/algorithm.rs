@@ -9,7 +9,7 @@ pub fn combination(n: u64, r: u64) -> u64 {
     perm / (1..=r).product::<u64>()
 }
 
-pub fn used_card(cards: &mut [u64], message: Played) {
+pub fn used_card(cards: &mut [u8], message: Played) {
     match message {
         Played::MoveMent(movement) => {
             let i: usize = movement.play_card.into();
@@ -17,7 +17,7 @@ pub fn used_card(cards: &mut [u64], message: Played) {
         }
         Played::Attack(attack) => {
             let i: usize = attack.play_card.into();
-            cards[i - 1] -= 1;
+            cards[i - 1] -= attack.num_of_card * 2;
         }
     }
 }
