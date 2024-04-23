@@ -3,7 +3,7 @@ use num_rational::Ratio;
 use crate::protocol::{BoardInfo, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
-const HANDS_DEFAULT_U64: u64 = 5;
+const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
@@ -26,7 +26,7 @@ impl ProbabilityTable {
         }
     }
 
-    fn hand(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
+    fn card(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
         match i {
             1 => Some(self.card1),
             2 => Some(self.card2),
@@ -37,8 +37,8 @@ impl ProbabilityTable {
         }
     }
 
-    fn access(&self, hand: u8, quantity: usize) -> Option<Ratio<u64>> {
-        match hand {
+    fn access(&self, card: u8, quantity: usize) -> Option<Ratio<u64>> {
+        match card {
             1 => self.card1.get(quantity).copied(),
             2 => self.card2.get(quantity).copied(),
             3 => self.card3.get(quantity).copied(),
