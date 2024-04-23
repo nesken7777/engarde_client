@@ -26,7 +26,7 @@ impl ProbabilityTable {
         }
     }
 
-    fn hand(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
+    fn card(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
         match i {
             1 => Some(self.card1),
             2 => Some(self.card2),
@@ -37,8 +37,8 @@ impl ProbabilityTable {
         }
     }
 
-    fn access(&self, hand: u8, quantity: usize) -> Option<Ratio<u64>> {
-        match hand {
+    fn access(&self, card: u8, quantity: usize) -> Option<Ratio<u64>> {
+        match card {
             1 => self.card1.get(quantity).copied(),
             2 => self.card2.get(quantity).copied(),
             3 => self.card3.get(quantity).copied(),
@@ -115,25 +115,36 @@ fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<
         .unwrap()
 }
 
-// pub fn safe_possibility(not_bochi: &[u64], hands: &[u64]) -> [u64; 5] {
-//     let arr: [u64; 5] = (0..5)
-//         .map(|i| {
-//             if 5 - not_bochi[i] - hands[i] <= hands[i] {
-//                 100
-//             } else {
-//                 let possiblity = ProbilityTable::new();
-//                 let winrate = 0;
-//                 let i: usize = 1;
-//                 let j: usize = 1;
-//                 while i < hands[i] as usize {
-//                     while j < 4 {
-//                         possiblity.access(i, j);
-//                         j += 1;
-//                     }
-//                 }
-//             }
-//         })
-//         .collect::<Vec<u64>>()
-//         .try_into()
-//         .unwrap();
-// }
+pub fn safe_possibility(
+    not_bochi: &[u64],
+    hands: &[u64],
+    table: &ProbabilityTable,
+) -> [Ratio<u64>; 5] {
+    (0..5)
+        .map(|i| {
+            if 5 - not_bochi[i] - hands[i] <= hands[i] {
+                Ratio::<u64>::from_integer(100)
+            } else {
+                calc_possibility(hands, table)
+            }
+        })
+        .collect::<Vec<Ratio<u64>>>()
+        .try_into()
+        .unwrap()
+}
+//safe_possibilityで使う計算過程
+fn calc_possibility(hands: &[u64], table: &ProbabilityTable) -> Ratio<u64> {
+    let mut possibility = Ratio::<u64>::from_integer(0);
+    let mut j: usize = 0;
+    let mut i = 0;
+    while i < 5 {
+        while j < 4 {
+            if hands[i] >= j as u64 {
+                possibility += table.access(i as u8, j).unwrap();
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    possibility
+}
