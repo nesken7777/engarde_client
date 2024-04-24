@@ -3,7 +3,7 @@ use num_rational::Ratio;
 use crate::protocol::{BoardInfo, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
-const HANDS_DEFAULT_U64: u64 = 5;
+const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
