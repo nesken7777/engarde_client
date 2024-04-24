@@ -41,14 +41,14 @@ pub struct ProbabilityTable {
 }
 
 impl ProbabilityTable {
-    pub fn new() -> Self {
-        const DEFAULT: Ratio<u64> = Ratio::<u64>::new_raw(1, 30);
+    pub fn new(num_of_deck: u8,cards: &RestCards) -> Self {
+        let total_unvisible_cards = num_of_deck + HANDS_DEFAULT_U8;
         ProbabilityTable {
-            card1: [DEFAULT; 6],
-            card2: [DEFAULT; 6],
-            card3: [DEFAULT; 6],
-            card4: [DEFAULT; 6],
-            card5: [DEFAULT; 6],
+            card1: probability(cards[0], total_unvisible_cards),
+            card2: probability(cards[1], total_unvisible_cards),
+            card3: probability(cards[2], total_unvisible_cards),
+            card4: probability(cards[3], total_unvisible_cards),
+            card5: probability(cards[4], total_unvisible_cards),
         }
     }
 
@@ -71,26 +71,6 @@ impl ProbabilityTable {
             4 => self.card4.get(quantity).copied(),
             5 => self.card5.get(quantity).copied(),
             _ => None,
-        }
-    }
-
-    pub fn update(&mut self, board: &BoardInfo, cards: &[u8]) {
-        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
-        self.card1 = probability(cards[0], total_unvisible_cards);
-        self.card2 = probability(cards[1], total_unvisible_cards);
-        self.card3 = probability(cards[2], total_unvisible_cards);
-        self.card4 = probability(cards[3], total_unvisible_cards);
-        self.card5 = probability(cards[4], total_unvisible_cards);
-    }
-
-    fn update_copy(board: &BoardInfo, cards: &[u8]) -> Self {
-        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
-        Self {
-            card1: probability(cards[0], total_unvisible_cards),
-            card2: probability(cards[1], total_unvisible_cards),
-            card3: probability(cards[2], total_unvisible_cards),
-            card4: probability(cards[3], total_unvisible_cards),
-            card5: probability(cards[4], total_unvisible_cards),
         }
     }
 }

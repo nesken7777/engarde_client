@@ -148,7 +148,6 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> 
 }
 
 fn act(
-    prob_table: &mut ProbabilityTable,
     cards: &mut RestCards,
     my_info: &PlayerProperty,
     board_state: &BoardInfo,
@@ -189,13 +188,11 @@ fn main() -> Result<(), Errors> {
     }
     {
         let mut board_state = BoardInfo::new();
-        let mut prob_table = ProbabilityTable::new();
         let mut cards = RestCards::new();
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
                     BoardInfo(board_info) => {
-                        prob_table.update(&board_info, &cards);
                         my_info.position = match my_info.id {
                             0 => board_info.player_position_0,
                             1 => board_info.player_position_1,
@@ -206,7 +203,6 @@ fn main() -> Result<(), Errors> {
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
                     Accept(_) => (),
                     DoPlay(_) => act(
-                        &mut prob_table,
                         &mut cards,
                         &my_info,
                         &board_state,
@@ -215,7 +211,6 @@ fn main() -> Result<(), Errors> {
                     ServerError(_) => {
                         print("エラーもらった")?;
                         act(
-                            &mut prob_table,
                             &mut cards,
                             &my_info,
                             &board_state,
