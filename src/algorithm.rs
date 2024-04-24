@@ -1,9 +1,35 @@
+use std::ops::{Index, IndexMut};
+
 use num_rational::Ratio;
 
 use crate::protocol::{BoardInfo, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
+
+//残りのカード枚数(種類ごと)
+pub struct RestCards {
+    hands: [u8; 5],
+}
+
+impl RestCards {
+    pub fn new() -> Self {
+        Self { hands: [5; 5] }
+    }
+}
+
+impl Index<usize> for RestCards {
+    type Output = u8;
+    fn index(&self, index: usize) -> &Self::Output {
+        self.hands.get(index).expect("out of bound")
+    }
+}
+
+impl IndexMut<usize> for RestCards {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.hands.get_mut(index).expect("out of bound")
+    }
+}
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
@@ -15,14 +41,14 @@ pub struct ProbabilityTable {
 }
 
 impl ProbabilityTable {
-    pub fn new() -> Self {
-        const DEFAULT: Ratio<u64> = Ratio::<u64>::new_raw(1, 30);
+    pub fn new(num_of_deck: u8,cards: &RestCards) -> Self {
+        let total_unvisible_cards = num_of_deck + HANDS_DEFAULT_U8;
         ProbabilityTable {
-            card1: [DEFAULT; 6],
-            card2: [DEFAULT; 6],
-            card3: [DEFAULT; 6],
-            card4: [DEFAULT; 6],
-            card5: [DEFAULT; 6],
+            card1: probability(cards[0], total_unvisible_cards),
+            card2: probability(cards[1], total_unvisible_cards),
+            card3: probability(cards[2], total_unvisible_cards),
+            card4: probability(cards[3], total_unvisible_cards),
+            card5: probability(cards[4], total_unvisible_cards),
         }
     }
 
@@ -47,26 +73,6 @@ impl ProbabilityTable {
             _ => None,
         }
     }
-
-    pub fn update(&mut self, board: &BoardInfo, cards: &[u8]) {
-        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
-        self.card1 = probability(cards[0], total_unvisible_cards);
-        self.card2 = probability(cards[1], total_unvisible_cards);
-        self.card3 = probability(cards[2], total_unvisible_cards);
-        self.card4 = probability(cards[3], total_unvisible_cards);
-        self.card5 = probability(cards[4], total_unvisible_cards);
-    }
-
-    fn update_copy(board: &BoardInfo, cards: &[u8]) -> Self {
-        let total_unvisible_cards = board.num_of_deck + HANDS_DEFAULT_U8;
-        Self {
-            card1: probability(cards[0], total_unvisible_cards),
-            card2: probability(cards[1], total_unvisible_cards),
-            card3: probability(cards[2], total_unvisible_cards),
-            card4: probability(cards[3], total_unvisible_cards),
-            card5: probability(cards[4], total_unvisible_cards),
-        }
-    }
 }
 
 fn permutation(n: u64, r: u64) -> u64 {
@@ -82,7 +88,7 @@ fn combination(n: u64, r: u64) -> u64 {
     perm / (1..=r).product::<u64>()
 }
 
-pub fn used_card(cards: &mut [u8], message: Played) {
+pub fn used_card(cards: &mut RestCards, message: Played) {
     match message {
         Played::MoveMent(movement) => {
             let i: usize = movement.play_card.into();
