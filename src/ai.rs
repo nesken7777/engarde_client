@@ -4,7 +4,7 @@ use rurel::mdp::State;
 
 use crate::protocol::{
     self,
-    Action::{self, Move},
+    Action,
     Direction::{Back, Forward},
     Movement, PlayerID,
 };
