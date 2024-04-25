@@ -1,7 +1,7 @@
 mod algorithm;
 mod errors;
 mod protocol;
-use algorithm::{RestCards, ProbabilityTable};
+use algorithm::RestCards;
 use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
@@ -204,20 +204,10 @@ fn main() -> Result<(), Errors> {
                     }
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
                     Accept(_) => (),
-                    DoPlay(_) => act(
-                        &mut cards,
-                        &my_info,
-                        &board_state,
-                        &mut bufwriter,
-                    )?,
+                    DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
                     ServerError(_) => {
                         print("エラーもらった")?;
-                        act(
-                            &mut cards,
-                            &my_info,
-                            &board_state,
-                            &mut bufwriter,
-                        )?;
+                        act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
                     }
                     Played(played) => algorithm::used_card(&mut cards, played),
                     RoundEnd(_round_end) => {
