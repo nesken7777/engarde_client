@@ -1,3 +1,4 @@
+mod ai;
 mod algorithm;
 mod errors;
 mod protocol;
