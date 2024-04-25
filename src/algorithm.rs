@@ -41,7 +41,9 @@ pub struct ProbabilityTable {
 }
 
 impl ProbabilityTable {
-    pub fn new(num_of_deck: u8, cards: &RestCards) -> Self {
+
+    pub fn new(num_of_deck: u8,cards: &RestCards) -> Self {
+
         let total_unvisible_cards = num_of_deck + HANDS_DEFAULT_U8;
         ProbabilityTable {
             card1: probability(cards[0], total_unvisible_cards),
@@ -125,6 +127,7 @@ pub enum Status {
     Move,
 }
 //その行動を行った時に安全である確率を求める。distanceは相手との距離、unvisibleは墓地にあるカード枚数、handsは自分の手札、tableは相手が指定されたカードを何枚もっているか保持している構造体、statusは攻撃か動きかを指定する。
+//返り値はそのカードでアタックまたは行動を行ったときの安全な確率。
 pub fn safe_possibility(
     distance: u64,
     unvisible: &[u64],
@@ -146,7 +149,7 @@ pub fn safe_possibility(
             .unwrap(),
         Status::Move => {
             let duplicate = check_dup(distance);
-            let reacheable = check_reacheable(hands, distance);
+
             (0..5)
                 .map(|i| match duplicate[i] {
                     true => {
@@ -173,47 +176,49 @@ pub fn safe_possibility(
 //勝負したい距離につめるためにその距離の手札を使わなければいけないかどうか
 fn check_dup(distance: u64) -> [bool; 5] {
     let mut arr = [false; 5];
-    let i = 0;
+    let mut i = 0;
     while i < 5 {
-        match distance - i * 2 {
-            0 => arr[i as usize] = true,
-            _ => (),
+        if distance - (i * 2) == 0{
+            arr[i as usize] = true;
         }
+        i+=1;
     }
     arr
 }
 //自分の手札に相手にどの距離で勝負可能かを示す
 fn check_reacheable(hands: &[u64], distance: u64) -> [bool; 5] {
     let mut arr = [false; 5];
-    let i: usize = 0;
+    let mut i: usize = 0;
     while i < 5 {
         match distance - i as u64 {
             1 => {
                 if hands[i] != 0 {
                     arr[0] = true
                 }
-            }
+            },
             2 => {
                 if hands[i] != 0 {
                     arr[1] = true
                 }
-            }
+            },
             3 => {
                 if hands[i] != 0 {
                     arr[2] = true
                 }
-            }
+            },
             4 => {
                 if hands[i] != 0 {
                     arr[3] = true
                 }
-            }
+            },
             5 => {
                 if hands[i] != 0 {
                     arr[4] = true
                 }
-            }
+            },
+            _=>()
         }
+        i+=1;
     }
     while i < 5 {
         match distance + i as u64 {
@@ -221,28 +226,30 @@ fn check_reacheable(hands: &[u64], distance: u64) -> [bool; 5] {
                 if hands[i] != 0 {
                     arr[0] = true
                 }
-            }
+            },
             2 => {
                 if hands[i] != 0 {
                     arr[1] = true
                 }
-            }
+            },
             3 => {
                 if hands[i] != 0 {
                     arr[2] = true
                 }
-            }
+            },
             4 => {
                 if hands[i] != 0 {
                     arr[3] = true
                 }
-            }
+            },
             5 => {
                 if hands[i] != 0 {
                     arr[4] = true
                 }
-            }
+            },
+            _=>()
         }
+        i+=1;
     }
     arr
 }
@@ -262,6 +269,7 @@ fn calc_possibility(
                 if (hands[card_num as usize] - 1) >= i {
                     possibility += table.access(card_num as u8, i as usize).unwrap();
                 }
+                i+=1;
             }
         }
         false => {
@@ -269,6 +277,7 @@ fn calc_possibility(
                 if hands[card_num as usize] >= i {
                     possibility += table.access(card_num as u8, i as usize).unwrap();
                 }
+                i+=1;
             }
         }
     }
