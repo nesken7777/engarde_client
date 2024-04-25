@@ -173,6 +173,8 @@ fn act(
 fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
+    print("connect?")?;
+    read_keybord()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
