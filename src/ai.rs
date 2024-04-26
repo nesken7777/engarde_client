@@ -1,10 +1,9 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Neg};
 
-use rurel::mdp::State;
+use rurel::mdp::{Agent, State};
 
 use crate::protocol::{
-    self,
-    Action,
+    self, Action,
     Direction::{Back, Forward},
     Movement, PlayerID,
 };
@@ -21,7 +20,11 @@ impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
         // Negative Euclidean distance
-        1.0
+        let distance = (self.enemy_position as i8 - self.my_position as i8).abs();
+        let rokutonokyori = (6 - distance).abs();
+        let point1 = rokutonokyori.neg() as f64;
+        let point2 = if distance < 6 { -1.0 } else { 0.0 };
+        [point1, point2].into_iter().sum()
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: [u8; 5], card: u8) -> Vec<Action> {
@@ -65,15 +68,14 @@ impl State for MyState {
             PlayerID::Zero => {
                 let moves = set
                     .into_iter()
-                    .map(|card| {
+                    .flat_map(|card| {
                         decide_moves(
                             self.my_position - card > 0,
                             self.my_position + card < self.enemy_position,
                             card,
                         )
                     })
-                    .collect::<Vec<Vec<Action>>>()
-                    .concat();
+                    .collect::<Vec<Action>>();
                 [
                     moves,
                     attack_cards(self.hands, self.enemy_position - self.my_position),
@@ -83,21 +85,35 @@ impl State for MyState {
             PlayerID::One => {
                 let moves = set
                     .into_iter()
-                    .map(|card| {
+                    .flat_map(|card| {
                         decide_moves(
                             self.my_position + card < 23,
                             self.my_position - card > self.enemy_position,
                             card,
                         )
                     })
-                    .collect::<Vec<Vec<Action>>>()
-                    .concat();
+                    .collect::<Vec<Action>>();
                 [
                     moves,
                     attack_cards(self.hands, self.my_position - self.enemy_position),
                 ]
                 .concat()
             }
+        }
+    }
+}
+
+struct MyAgent {
+    state: MyState,
+}
+impl Agent<MyState> for MyAgent {
+    fn current_state(&self) -> &MyState {
+        &self.state
+    }
+    fn take_action(&mut self, action: &Action) {
+        match action {
+            Action::Move(m) => todo!(),
+            Action::Attack(a) => todo!(),
         }
     }
 }
