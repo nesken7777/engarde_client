@@ -7,6 +7,49 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PlayerID {
+    Zero,
+    One,
+}
+
+impl<'de> Deserialize<'de> for PlayerID {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct MyEnumVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for MyEnumVisitor {
+            type Value = PlayerID;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("0 or 1")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v.trim() {
+                    "0" => Ok(PlayerID::Zero),
+                    "1" => Ok(PlayerID::One),
+                    _ => Err(E::invalid_value(serde::de::Unexpected::Str(v), &self)),
+                }
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_str(v.as_str())
+            }
+        }
+
+        deserializer.deserialize_string(MyEnumVisitor)
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct BoardInfo {
     #[serde(rename = "Type")]
@@ -40,12 +83,8 @@ pub struct BoardInfo {
         deserialize_with = "deserialize_number_from_string"
     )]
     pub num_of_deck: u8,
-    #[serde(
-        rename = "CurrentPlayer",
-        default,
-        deserialize_with = "deserialize_option_number_from_string"
-    )]
-    pub current_player: Option<u8>,
+    #[serde(rename = "CurrentPlayer", default)]
+    pub current_player: Option<PlayerID>,
 }
 
 impl BoardInfo {
@@ -59,7 +98,7 @@ impl BoardInfo {
             player_score_0: 0,
             player_score_1: 0,
             num_of_deck: 15,
-            current_player: Some(0),
+            current_player: Some(PlayerID::Zero),
         }
     }
 
@@ -143,6 +182,7 @@ pub struct Accept {
     message_id: String,
 }
 
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Direction {
     Forward,
     Back,
@@ -157,16 +197,19 @@ impl Display for Direction {
     }
 }
 
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Movement {
     pub card: u8,
     pub direction: Direction,
 }
 
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Attack {
     pub card: u8,
     pub quantity: u8,
 }
 
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Action {
     Move(Movement),
     Attack(Attack),

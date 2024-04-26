@@ -1,7 +1,7 @@
 mod algorithm;
 mod errors;
 mod protocol;
-use algorithm::{RestCards, ProbabilityTable};
+use algorithm::RestCards;
 use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
@@ -173,6 +173,8 @@ fn act(
 fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
+    print("connect?")?;
+    read_keybord()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
@@ -202,20 +204,10 @@ fn main() -> Result<(), Errors> {
                     }
                     HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
                     Accept(_) => (),
-                    DoPlay(_) => act(
-                        &mut cards,
-                        &my_info,
-                        &board_state,
-                        &mut bufwriter,
-                    )?,
+                    DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
                     ServerError(_) => {
                         print("エラーもらった")?;
-                        act(
-                            &mut cards,
-                            &my_info,
-                            &board_state,
-                            &mut bufwriter,
-                        )?;
+                        act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
                     }
                     Played(played) => algorithm::used_card(&mut cards, played),
                     RoundEnd(_round_end) => {
