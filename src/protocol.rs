@@ -386,11 +386,8 @@ pub struct ConnectionStart {
     from: String,
     #[serde(rename = "To")]
     to: String,
-    #[serde(
-        rename = "ClientID",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub client_id: u8,
+    #[serde(rename = "ClientID")]
+    pub client_id: PlayerID,
 }
 
 #[derive(Serialize)]
@@ -536,13 +533,13 @@ impl PlayAttack {
 }
 
 pub struct PlayerProperty {
-    pub id: u8,
+    pub id: PlayerID,
     pub hand: Vec<u8>,
     pub position: u8,
 }
 
 impl PlayerProperty {
-    pub fn new(id: u8) -> Self {
+    pub fn new(id: PlayerID) -> Self {
         Self {
             id,
             hand: vec![],

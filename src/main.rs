@@ -5,7 +5,7 @@ use algorithm::RestCards;
 use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
-    PlayAttack, PlayMovement, PlayerName, PlayerProperty,
+    PlayAttack, PlayMovement, PlayerID, PlayerName, PlayerProperty,
 };
 use serde::Serialize;
 use std::{
@@ -37,7 +37,7 @@ where
     Ok(string.trim().to_string())
 }
 
-fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Errors>
+fn connect<T>(bufreader: &mut BufReader<T>) -> Result<PlayerID, Errors>
 where
     T: Read,
 {
@@ -196,9 +196,8 @@ fn main() -> Result<(), Errors> {
                 Ok(messages) => match messages {
                     BoardInfo(board_info) => {
                         my_info.position = match my_info.id {
-                            0 => board_info.player_position_0,
-                            1 => board_info.player_position_1,
-                            _ => unreachable!(),
+                            PlayerID::Zero => board_info.player_position_0,
+                            PlayerID::One => board_info.player_position_1,
                         };
                         board_state = board_info;
                     }
