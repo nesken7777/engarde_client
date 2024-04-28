@@ -1,19 +1,38 @@
-use std::{collections::HashSet, ops::Neg};
-
-use rurel::mdp::{Agent, State};
-
-use crate::protocol::{
-    self, Action,
-    Direction::{Back, Forward},
-    Movement, PlayerID,
+use std::{
+    collections::HashSet,
+    // fs::OpenOptions,
+    hash::RandomState,
+    io::{BufReader, BufWriter /*Write*/},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    ops::Neg,
 };
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+use rurel::{
+    mdp::{Agent, State},
+    strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
+    AgentTrainer,
+};
+
+use crate::{
+    algorithm::{self, RestCards},
+    connect,
+    errors::Errors,
+    protocol::{
+        self, Action, BoardInfo,
+        Direction::{Back, Forward},
+        Evaluation, Messages, Movement, PlayAttack, PlayMovement, PlayerID, PlayerName,
+    },
+    read_keyboard, read_stream, send_info,
+};
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct MyState {
     my_id: PlayerID,
-    hands: [u8; 5],
+    hands: Vec<u8>,
+    cards: RestCards,
     my_position: u8,
     enemy_position: u8,
+    game_end: bool,
 }
 
 impl State for MyState {
@@ -27,8 +46,11 @@ impl State for MyState {
         [point1, point2].into_iter().sum()
     }
     fn actions(&self) -> Vec<Action> {
-        fn attack_cards(hands: [u8; 5], card: u8) -> Vec<Action> {
-            let have = hands.into_iter().filter(|&x| x == card).count();
+        if self.game_end {
+            return Vec::new();
+        }
+        fn attack_cards(hands: &[u8], card: u8) -> Vec<Action> {
+            let have = hands.iter().filter(|&&x| x == card).count();
             (1..=have)
                 .map(|x| {
                     Action::Attack(protocol::Attack {
@@ -63,22 +85,23 @@ impl State for MyState {
                 }
             }
         }
-        let set = HashSet::from(self.hands);
+        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().cloned());
         match self.my_id {
             PlayerID::Zero => {
                 let moves = set
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.my_position - card > 0,
+                            self.my_position.saturating_sub(card) > 0,
                             self.my_position + card < self.enemy_position,
                             card,
                         )
                     })
                     .collect::<Vec<Action>>();
+
                 [
                     moves,
-                    attack_cards(self.hands, self.enemy_position - self.my_position),
+                    attack_cards(&self.hands, self.enemy_position - self.my_position),
                 ]
                 .concat()
             }
@@ -93,9 +116,10 @@ impl State for MyState {
                         )
                     })
                     .collect::<Vec<Action>>();
+
                 [
                     moves,
-                    attack_cards(self.hands, self.my_position - self.enemy_position),
+                    attack_cards(&self.hands, self.my_position - self.enemy_position),
                 ]
                 .concat()
             }
@@ -104,16 +128,132 @@ impl State for MyState {
 }
 
 struct MyAgent {
+    reader: BufReader<TcpStream>,
+    writer: BufWriter<TcpStream>,
     state: MyState,
 }
+
+impl MyAgent {
+    fn new(
+        id: PlayerID,
+        hands: Vec<u8>,
+        position_0: u8,
+        position_1: u8,
+        reader: BufReader<TcpStream>,
+        writer: BufWriter<TcpStream>,
+    ) -> Self {
+        let (my_position, enemy_position) = match id {
+            PlayerID::Zero => (position_0, position_1),
+            PlayerID::One => (position_1, position_0),
+        };
+        MyAgent {
+            reader,
+            writer,
+            state: MyState {
+                my_id: id,
+                hands,
+                cards: RestCards::new(),
+                my_position,
+                enemy_position,
+                game_end: false,
+            },
+        }
+    }
+}
+
 impl Agent<MyState> for MyAgent {
     fn current_state(&self) -> &MyState {
         &self.state
     }
     fn take_action(&mut self, action: &Action) {
-        match action {
-            Action::Move(m) => todo!(),
-            Action::Attack(a) => todo!(),
+        fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) {
+            match action {
+                Action::Move(m) => send_info(writer, &PlayMovement::from_info(*m)).unwrap(),
+                Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)).unwrap(),
+            }
+        }
+        use Messages::*;
+        match Messages::parse(&read_stream(&mut self.reader).unwrap()) {
+            Ok(messages) => match messages {
+                BoardInfo(board_info) => {
+                    (self.state.my_position, self.state.enemy_position) = match self.state.my_id {
+                        PlayerID::Zero => {
+                            (board_info.player_position_0, board_info.player_position_1)
+                        }
+                        PlayerID::One => {
+                            (board_info.player_position_1, board_info.player_position_0)
+                        }
+                    };
+                }
+                HandInfo(hand_info) => self.state.hands = hand_info.to_vec(),
+                Accept(_) => (),
+                DoPlay(_) => {
+                    send_info(&mut self.writer, &Evaluation::new()).unwrap();
+                    send_action(&mut self.writer, action);
+                }
+                ServerError(e) => {
+                    println!("エラーもらった");
+                    println!("{:?}", e);
+                }
+                Played(played) => algorithm::used_card(&mut self.state.cards, played),
+                RoundEnd(round_end) => {
+                    println!("ラウンド終わり! 勝者:{}", round_end.round_winner);
+                    self.state.cards = RestCards::new();
+                }
+                GameEnd(game_end) => {
+                    println!("ゲーム終わり! 勝者:{}", game_end.winner);
+                    self.state.game_end = true;
+                }
+            },
+            Err(e) => {
+                println!("JSON解析できなかった");
+                println!("{}", e);
+            }
         }
     }
+}
+
+pub fn ai_main() -> Result<(), Errors> {
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
+    println!("connect?");
+    read_keyboard()?;
+    let stream = TcpStream::connect(addr)?;
+    let (mut bufreader, mut bufwriter) =
+        (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+    let id = connect(&mut bufreader)?;
+    let player_name = PlayerName::new("qai".to_string());
+    send_info(&mut bufwriter, &player_name)?;
+    let _ = read_stream(&mut bufreader)?;
+    let mut board_info_init = BoardInfo::new();
+    let hand_info = loop {
+        let message = Messages::parse(&read_stream(&mut bufreader)?)?;
+        if let Messages::HandInfo(hand_info) = message {
+            break hand_info;
+        } else if let Messages::BoardInfo(board_info) = message {
+            board_info_init = board_info;
+        }
+    };
+    let mut agent = MyAgent::new(
+        id,
+        hand_info.to_vec(),
+        board_info_init.player_position_0,
+        board_info_init.player_position_1,
+        bufreader,
+        bufwriter,
+    );
+    let mut trainer = AgentTrainer::new();
+    trainer.train(
+        &mut agent,
+        &QLearning::new(0.2, 0.9, 0.0),
+        &mut SinkStates {},
+        &RandomExploration::new(),
+    );
+    // let filename = format!("learned{}.txt", id.denote());
+    // let mut file = OpenOptions::new()
+    //     .write(true)
+    //     .truncate(true)
+    //     .create(true)
+    //     .open(filename)?;
+    // file.write_all(format!("{:?}", trainer.export_learned_values()).as_bytes())?;
+    Ok(())
 }

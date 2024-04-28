@@ -2,6 +2,7 @@ mod ai;
 mod algorithm;
 mod errors;
 mod protocol;
+use ai::ai_main;
 use algorithm::RestCards;
 use errors::Errors;
 use protocol::{
@@ -172,58 +173,59 @@ fn act(
 }
 
 fn main() -> Result<(), Errors> {
-    // IPアドレスはいつか標準入力になると思います。
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
-    print("connect?")?;
-    read_keyboard()?;
-    let stream = TcpStream::connect(addr)?;
-    let (mut bufreader, mut bufwriter) =
-        (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    let id = connect(&mut bufreader)?;
-    let mut my_info = PlayerProperty::new(id);
-    {
-        // ここはどうする?標準入力にする?
-        print("名前を入力")?;
-        let name = read_keyboard()?;
-        let player_name = PlayerName::new(name);
-        send_info(&mut bufwriter, &player_name)?;
-        let _ = read_stream(&mut bufreader)?;
-    }
-    {
-        let mut board_state = BoardInfo::new();
-        let mut cards = RestCards::new();
-        loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(messages) => match messages {
-                    BoardInfo(board_info) => {
-                        my_info.position = match my_info.id {
-                            PlayerID::Zero => board_info.player_position_0,
-                            PlayerID::One => board_info.player_position_1,
-                        };
-                        board_state = board_info;
-                    }
-                    HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
-                    Accept(_) => (),
-                    DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
-                    ServerError(_) => {
-                        print("エラーもらった")?;
-                        act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
-                    }
-                    Played(played) => algorithm::used_card(&mut cards, played),
-                    RoundEnd(_round_end) => {
-                        print("ラウンド終わり!")?;
-                        cards = RestCards::new();
-                    }
-                    GameEnd(_game_end) => {
-                        break;
-                    }
-                },
-                Err(e) => {
-                    print("JSON解析できなかった")?;
-                    print(format!("{}", e).as_str())?;
-                }
-            }
-        }
-    }
-    Ok(())
+    // // IPアドレスはいつか標準入力になると思います。
+    // let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
+    // print("connect?")?;
+    // read_keyboard()?;
+    // let stream = TcpStream::connect(addr)?;
+    // let (mut bufreader, mut bufwriter) =
+    //     (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+    // let id = connect(&mut bufreader)?;
+    // let mut my_info = PlayerProperty::new(id);
+    // {
+    //     // ここはどうする?標準入力にする?
+    //     print("名前を入力")?;
+    //     let name = read_keyboard()?;
+    //     let player_name = PlayerName::new(name);
+    //     send_info(&mut bufwriter, &player_name)?;
+    //     let _ = read_stream(&mut bufreader)?;
+    // }
+    // {
+    //     let mut board_state = BoardInfo::new();
+    //     let mut cards = RestCards::new();
+    //     loop {
+    //         match Messages::parse(&read_stream(&mut bufreader)?) {
+    //             Ok(messages) => match messages {
+    //                 BoardInfo(board_info) => {
+    //                     my_info.position = match my_info.id {
+    //                         PlayerID::Zero => board_info.player_position_0,
+    //                         PlayerID::One => board_info.player_position_1,
+    //                     };
+    //                     board_state = board_info;
+    //                 }
+    //                 HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
+    //                 Accept(_) => (),
+    //                 DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
+    //                 ServerError(_) => {
+    //                     print("エラーもらった")?;
+    //                     act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
+    //                 }
+    //                 Played(played) => algorithm::used_card(&mut cards, played),
+    //                 RoundEnd(_round_end) => {
+    //                     print("ラウンド終わり!")?;
+    //                     cards = RestCards::new();
+    //                 }
+    //                 GameEnd(_game_end) => {
+    //                     break;
+    //                 }
+    //             },
+    //             Err(e) => {
+    //                 print("JSON解析できなかった")?;
+    //                 print(format!("{}", e).as_str())?;
+    //             }
+    //         }
+    //     }
+    // }
+    // Ok(())
+    ai_main()
 }
