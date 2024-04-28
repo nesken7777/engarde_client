@@ -551,7 +551,7 @@ impl PlayerProperty {
     pub fn new(id: PlayerID) -> Self {
         Self {
             id,
-            hand: vec![],
+            hand: Vec::new(),
             position: 0,
         }
     }
