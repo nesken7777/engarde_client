@@ -1,8 +1,8 @@
 use std::{
-    collections::HashSet,
-    // fs::OpenOptions,
+    collections::{HashMap, HashSet},
+    fs::OpenOptions,
     hash::RandomState,
-    io::{BufReader, BufWriter /*Write*/},
+    io::{BufReader, BufWriter, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
     ops::Neg,
 };
@@ -12,6 +12,7 @@ use rurel::{
     strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
     AgentTrainer,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     algorithm::{self, RestCards},
@@ -25,7 +26,7 @@ use crate::{
     read_keyboard, read_stream, send_info,
 };
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 struct MyState {
     my_id: PlayerID,
     hands: Vec<u8>,
@@ -241,19 +242,54 @@ pub fn ai_main() -> Result<(), Errors> {
         bufreader,
         bufwriter,
     );
-    let mut trainer = AgentTrainer::new();
+    let path = format!("learned{}.json", id.denote());
+    let mut trainer = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
+        let mut string = String::new();
+        file.read_to_string(&mut string)?;
+        let mut agent = AgentTrainer::new();
+        let imported =
+            serde_json::from_str::<HashMap<String, HashMap<String, f64>>>(string.trim())?;
+        let imported = imported
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    serde_json::from_str(&k).unwrap(),
+                    v.into_iter()
+                        .map(|(k2, v2)| (serde_json::from_str(&k2).unwrap(), v2))
+                        .collect::<HashMap<Action, f64>>(),
+                )
+            })
+            .collect::<HashMap<MyState, _>>();
+        agent.import_state(imported);
+        agent
+    } else {
+        AgentTrainer::new()
+    };
     trainer.train(
         &mut agent,
         &QLearning::new(0.2, 0.9, 0.0),
         &mut SinkStates {},
         &RandomExploration::new(),
     );
-    // let filename = format!("learned{}.txt", id.denote());
-    // let mut file = OpenOptions::new()
-    //     .write(true)
-    //     .truncate(true)
-    //     .create(true)
-    //     .open(filename)?;
-    // file.write_all(format!("{:?}", trainer.export_learned_values()).as_bytes())?;
+    let filename = format!("learned{}.json", id.denote());
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(filename)?;
+    let exported = trainer.export_learned_values();
+    let converted = exported
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                serde_json::to_string(&k).unwrap(),
+                v.into_iter()
+                    .map(|(k2, v2)| (serde_json::to_string(&k2).unwrap(), v2))
+                    .collect::<HashMap<_, _>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    file.write_all(serde_json::to_string(&converted)?.as_bytes())?;
+
     Ok(())
 }
