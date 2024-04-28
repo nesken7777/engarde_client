@@ -8,6 +8,7 @@ const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 
 //残りのカード枚数(種類ごと)
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RestCards {
     hands: [u8; 5],
 }
@@ -155,14 +156,14 @@ pub fn safe_possibility(
                         if 5 - unvisible[i] - hands[i] <= (hands[i] - 1) {
                             Ratio::<u64>::from_integer(100)
                         } else {
-                            calc_possibility_move(hands, table, (distance- i as i64) , true)
+                            calc_possibility_move(hands, table, (distance - i as i64), true)
                         }
                     }
                     false => {
                         if 5 - unvisible[i] - hands[i] <= hands[i] {
                             Ratio::<u64>::from_integer(100)
                         } else {
-                            calc_possibility_move(hands, table, (distance - i as i64) , false)
+                            calc_possibility_move(hands, table, (distance - i as i64), false)
                         }
                     }
                 })
@@ -286,12 +287,12 @@ fn calc_possibility_move(
 ) -> Ratio<u64> {
     let mut possibility = Ratio::<u64>::from_integer(0);
     let mut i = 0;
-    if card_num<=0{
-        return possibility
+    if card_num <= 0 {
+        return possibility;
     }
-    if card_num>=6{
-        possibility=Ratio::<u64>::from_integer(1);
-        return possibility
+    if card_num >= 6 {
+        possibility = Ratio::<u64>::from_integer(1);
+        return possibility;
     }
     match dup {
         true => {

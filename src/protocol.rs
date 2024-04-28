@@ -13,6 +13,15 @@ pub enum PlayerID {
     One,
 }
 
+impl PlayerID {
+    pub fn denote(&self) -> u8 {
+        match self {
+            PlayerID::Zero => 0,
+            PlayerID::One => 1,
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for PlayerID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -182,7 +191,7 @@ pub struct Accept {
     message_id: String,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum Direction {
     Forward,
     Back,
@@ -197,19 +206,19 @@ impl Display for Direction {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Movement {
     pub card: u8,
     pub direction: Direction,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Attack {
     pub card: u8,
     pub quantity: u8,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum Action {
     Move(Movement),
     Attack(Attack),
@@ -300,7 +309,7 @@ pub struct GameEnd {
     pub message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename = "Error")]
 pub struct ServerError {
     #[serde(rename = "Type")]
@@ -542,7 +551,7 @@ impl PlayerProperty {
     pub fn new(id: PlayerID) -> Self {
         Self {
             id,
-            hand: vec![],
+            hand: Vec::new(),
             position: 0,
         }
     }
