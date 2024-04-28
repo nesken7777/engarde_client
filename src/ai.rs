@@ -18,6 +18,7 @@ use crate::{
     algorithm::{self, RestCards},
     connect,
     errors::Errors,
+    print,
     protocol::{
         self, Action, BoardInfo,
         Direction::{Back, Forward},
@@ -167,48 +168,58 @@ impl Agent<MyState> for MyAgent {
         &self.state
     }
     fn take_action(&mut self, action: &Action) {
-        fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) {
+        fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) -> Result<(), Errors> {
             match action {
-                Action::Move(m) => send_info(writer, &PlayMovement::from_info(*m)).unwrap(),
-                Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)).unwrap(),
+                Action::Move(m) => send_info(writer, &PlayMovement::from_info(*m)),
+                Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)),
             }
         }
         use Messages::*;
-        match Messages::parse(&read_stream(&mut self.reader).unwrap()) {
-            Ok(messages) => match messages {
-                BoardInfo(board_info) => {
-                    (self.state.my_position, self.state.enemy_position) = match self.state.my_id {
-                        PlayerID::Zero => {
-                            (board_info.player_position_0, board_info.player_position_1)
-                        }
-                        PlayerID::One => {
-                            (board_info.player_position_1, board_info.player_position_0)
-                        }
-                    };
+        let mut take_action_result = || -> Result<(), Errors> {
+            match Messages::parse(&read_stream(&mut self.reader)?) {
+                Ok(messages) => match messages {
+                    BoardInfo(board_info) => {
+                        (self.state.my_position, self.state.enemy_position) = match self.state.my_id
+                        {
+                            PlayerID::Zero => {
+                                (board_info.player_position_0, board_info.player_position_1)
+                            }
+                            PlayerID::One => {
+                                (board_info.player_position_1, board_info.player_position_0)
+                            }
+                        };
+                    }
+                    HandInfo(hand_info) => self.state.hands = hand_info.to_vec(),
+                    Accept(_) => (),
+                    DoPlay(_) => {
+                        send_info(&mut self.writer, &Evaluation::new())?;
+                        send_action(&mut self.writer, action)?;
+                    }
+                    ServerError(e) => {
+                        print("エラーもらった")?;
+                        print(format!("{:?}", e).as_str())?;
+                    }
+                    Played(played) => algorithm::used_card(&mut self.state.cards, played),
+                    RoundEnd(round_end) => {
+                        print(format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str())?;
+                        self.state.cards = RestCards::new();
+                    }
+                    GameEnd(game_end) => {
+                        print(format!("ゲーム終わり! 勝者:{}", game_end.winner).as_str())?;
+                        self.state.game_end = true;
+                    }
+                },
+                Err(e) => {
+                    print("JSON解析できなかった")?;
+                    print(format!("{}", e).as_str())?;
                 }
-                HandInfo(hand_info) => self.state.hands = hand_info.to_vec(),
-                Accept(_) => (),
-                DoPlay(_) => {
-                    send_info(&mut self.writer, &Evaluation::new()).unwrap();
-                    send_action(&mut self.writer, action);
-                }
-                ServerError(e) => {
-                    println!("エラーもらった");
-                    println!("{:?}", e);
-                }
-                Played(played) => algorithm::used_card(&mut self.state.cards, played),
-                RoundEnd(round_end) => {
-                    println!("ラウンド終わり! 勝者:{}", round_end.round_winner);
-                    self.state.cards = RestCards::new();
-                }
-                GameEnd(game_end) => {
-                    println!("ゲーム終わり! 勝者:{}", game_end.winner);
-                    self.state.game_end = true;
-                }
-            },
+            }
+            Ok(())
+        };
+        match take_action_result() {
+            Ok(_) => (),
             Err(e) => {
-                println!("JSON解析できなかった");
-                println!("{}", e);
+                print(format!("エラー発生:{}", e).as_str()).ok();
             }
         }
     }
@@ -216,7 +227,7 @@ impl Agent<MyState> for MyAgent {
 
 pub fn ai_main() -> Result<(), Errors> {
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
-    println!("connect?");
+    print("connect?")?;
     read_keyboard()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
@@ -252,14 +263,14 @@ pub fn ai_main() -> Result<(), Errors> {
         let imported = imported
             .into_iter()
             .map(|(k, v)| {
-                (
-                    serde_json::from_str(&k).unwrap(),
+                serde_json::from_str(&k).and_then(|state| {
                     v.into_iter()
-                        .map(|(k2, v2)| (serde_json::from_str(&k2).unwrap(), v2))
-                        .collect::<HashMap<Action, f64>>(),
-                )
+                        .map(|(k2, v2)| serde_json::from_str(&k2).map(|action| (action, v2)))
+                        .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()
+                        .map(|action_map| (state, action_map))
+                })
             })
-            .collect::<HashMap<MyState, _>>();
+            .collect::<Result<HashMap<MyState, HashMap<Action, f64>>, serde_json::Error>>()?;
         agent.import_state(imported);
         agent
     } else {
@@ -281,14 +292,14 @@ pub fn ai_main() -> Result<(), Errors> {
     let converted = exported
         .into_iter()
         .map(|(k, v)| {
-            (
-                serde_json::to_string(&k).unwrap(),
+            serde_json::to_string(&k).and_then(|state_str| {
                 v.into_iter()
-                    .map(|(k2, v2)| (serde_json::to_string(&k2).unwrap(), v2))
-                    .collect::<HashMap<_, _>>(),
-            )
+                    .map(|(k2, v2)| serde_json::to_string(&k2).map(|action_str| (action_str, v2)))
+                    .collect::<Result<HashMap<String, f64>, serde_json::Error>>()
+                    .map(|action_str_map| (state_str, action_str_map))
+            })
         })
-        .collect::<HashMap<_, _>>();
+        .collect::<Result<HashMap<String, HashMap<String, f64>>, serde_json::Error>>()?;
     file.write_all(serde_json::to_string(&converted)?.as_bytes())?;
 
     Ok(())
