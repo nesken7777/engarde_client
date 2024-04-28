@@ -21,7 +21,7 @@ fn print(string: &str) -> io::Result<()> {
     stdout.flush()
 }
 
-fn read_keybord() -> io::Result<String> {
+fn read_keyboard() -> io::Result<String> {
     let mut word = String::new();
     std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
@@ -60,7 +60,7 @@ where
 fn ask_card(player: &PlayerProperty) -> io::Result<u8> {
     loop {
         print("カードはどれにする?")?;
-        let Ok(card) = read_keybord()?.parse::<u8>() else {
+        let Ok(card) = read_keyboard()?.parse::<u8>() else {
             print("それ数字じゃないだろ")?;
             continue;
         };
@@ -77,7 +77,7 @@ fn ask_movement(player: &PlayerProperty) -> io::Result<Action> {
     let card = ask_card(player)?;
     let direction = loop {
         print("どっち向きにする?")?;
-        let string = read_keybord()?;
+        let string = read_keyboard()?;
         match string.as_str() {
             "F" => break Direction::Forward,
             "B" => break Direction::Back,
@@ -110,7 +110,7 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
     let quantity = {
         loop {
             print("何枚使う?")?;
-            let Ok(quantity) = read_keybord()?.parse::<u8>() else {
+            let Ok(quantity) = read_keyboard()?.parse::<u8>() else {
                 print("それ数字じゃないですよ")?;
                 continue;
             };
@@ -128,7 +128,7 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> 
     print(format!("手札:{:?}", player.hand).as_str())?;
     loop {
         print("どっちのアクションにする?")?;
-        let string = read_keybord()?;
+        let string = read_keyboard()?;
         match string.as_str() {
             "M" => break ask_movement(player),
             "A" => match ask_attack(player, board) {
@@ -174,7 +174,7 @@ fn main() -> Result<(), Errors> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     print("connect?")?;
-    read_keybord()?;
+    read_keyboard()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
@@ -183,7 +183,7 @@ fn main() -> Result<(), Errors> {
     {
         // ここはどうする?標準入力にする?
         print("名前を入力")?;
-        let name = read_keybord()?;
+        let name = read_keyboard()?;
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let _ = read_stream(&mut bufreader)?;
