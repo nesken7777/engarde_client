@@ -27,6 +27,8 @@ use crate::{
     read_keyboard, read_stream, send_info,
 };
 
+
+// Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 struct MyState {
     my_id: PlayerID,
@@ -129,6 +131,8 @@ impl State for MyState {
     }
 }
 
+
+// エージェントは、先ほどの「できる行動のリスト」からランダムで選択されたアクションを実行し、状態(先ほどのState)を変更する。
 struct MyAgent {
     reader: BufReader<TcpStream>,
     writer: BufWriter<TcpStream>,
@@ -175,6 +179,7 @@ impl Agent<MyState> for MyAgent {
             }
         }
         use Messages::*;
+        //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> Result<(), Errors> {
             match Messages::parse(&read_stream(&mut self.reader)?) {
                 Ok(messages) => match messages {
@@ -236,6 +241,8 @@ pub fn ai_main() -> Result<(), Errors> {
     let player_name = PlayerName::new("qai".to_string());
     send_info(&mut bufwriter, &player_name)?;
     let _ = read_stream(&mut bufreader)?;
+    
+    // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
     let mut board_info_init = BoardInfo::new();
     let hand_info = loop {
         let message = Messages::parse(&read_stream(&mut bufreader)?)?;
@@ -260,6 +267,8 @@ pub fn ai_main() -> Result<(), Errors> {
         let mut agent = AgentTrainer::new();
         let imported =
             serde_json::from_str::<HashMap<String, HashMap<String, f64>>>(string.trim())?;
+
+        // ごめん、ここは後述の、文字列化したキーを構造体に戻す作業をしてます
         let imported = imported
             .into_iter()
             .map(|(k, v)| {
@@ -289,6 +298,8 @@ pub fn ai_main() -> Result<(), Errors> {
         .create(true)
         .open(filename)?;
     let exported = trainer.export_learned_values();
+
+    // ごめん、ここはね、HashMapのままだとキーが文字列じゃないからjsonにできないんで、構造体のまま文字列化する処理です
     let converted = exported
         .into_iter()
         .map(|(k, v)| {
