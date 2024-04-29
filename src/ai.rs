@@ -27,7 +27,6 @@ use crate::{
     read_keyboard, read_stream, send_info,
 };
 
-
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 struct MyState {
@@ -130,7 +129,6 @@ impl State for MyState {
         }
     }
 }
-
 
 // エージェントは、先ほどの「できる行動のリスト」からランダムで選択されたアクションを実行し、状態(先ほどのState)を変更する。
 struct MyAgent {
@@ -241,7 +239,7 @@ pub fn ai_main() -> Result<(), Errors> {
     let player_name = PlayerName::new("qai".to_string());
     send_info(&mut bufwriter, &player_name)?;
     let _ = read_stream(&mut bufreader)?;
-    
+
     // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
     let mut board_info_init = BoardInfo::new();
     let hand_info = loop {
@@ -272,14 +270,17 @@ pub fn ai_main() -> Result<(), Errors> {
         let imported = imported
             .into_iter()
             .map(|(k, v)| {
-                serde_json::from_str(&k).and_then(|state| {
-                    v.into_iter()
-                        .map(|(k2, v2)| serde_json::from_str(&k2).map(|action| (action, v2)))
-                        .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()
-                        .map(|action_map| (state, action_map))
-                })
+                let state = serde_json::from_str(&k)?;
+                let action_map = v
+                    .into_iter()
+                    .map(|(k2, v2)| {
+                        let action = serde_json::from_str(&k2)?;
+                        Ok((action, v2))
+                    })
+                    .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()?;
+                Ok((state, action_map))
             })
-            .collect::<Result<HashMap<MyState, HashMap<Action, f64>>, serde_json::Error>>()?;
+            .collect::<Result<HashMap<MyState, _>, serde_json::Error>>()?;
         agent.import_state(imported);
         agent
     } else {
@@ -303,14 +304,17 @@ pub fn ai_main() -> Result<(), Errors> {
     let converted = exported
         .into_iter()
         .map(|(k, v)| {
-            serde_json::to_string(&k).and_then(|state_str| {
-                v.into_iter()
-                    .map(|(k2, v2)| serde_json::to_string(&k2).map(|action_str| (action_str, v2)))
-                    .collect::<Result<HashMap<String, f64>, serde_json::Error>>()
-                    .map(|action_str_map| (state_str, action_str_map))
-            })
+            let state_str = serde_json::to_string(&k)?;
+            let action_str_map = v
+                .into_iter()
+                .map(|(k2, v2)| {
+                    let action_str = serde_json::to_string(&k2)?;
+                    Ok((action_str, v2))
+                })
+                .collect::<Result<HashMap<String, f64>, serde_json::Error>>()?;
+            Ok((state_str, action_str_map))
         })
-        .collect::<Result<HashMap<String, HashMap<String, f64>>, serde_json::Error>>()?;
+        .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
     file.write_all(serde_json::to_string(&converted)?.as_bytes())?;
 
     Ok(())
