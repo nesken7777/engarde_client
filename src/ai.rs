@@ -250,6 +250,8 @@ pub fn ai_main() -> Result<(), Errors> {
             board_info_init = board_info;
         }
     };
+
+    // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,
         hand_info.to_vec(),
@@ -258,6 +260,9 @@ pub fn ai_main() -> Result<(), Errors> {
         bufreader,
         bufwriter,
     );
+
+
+    // ファイル読み込み
     let path = format!("learned{}.json", id.denote());
     let mut trainer = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
         let mut string = String::new();
@@ -286,6 +291,8 @@ pub fn ai_main() -> Result<(), Errors> {
     } else {
         AgentTrainer::new()
     };
+
+    //トレーニング開始
     trainer.train(
         &mut agent,
         &QLearning::new(0.2, 0.9, 0.0),
