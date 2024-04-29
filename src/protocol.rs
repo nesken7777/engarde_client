@@ -83,12 +83,12 @@ pub struct BoardInfo {
         rename = "PlayerScore_0",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_0: u8,
+    pub player_score_0: u32,
     #[serde(
         rename = "PlayerScore_1",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_1: u8,
+    pub player_score_1: u32,
     #[serde(
         rename = "NumofDeck",
         deserialize_with = "deserialize_number_from_string"
