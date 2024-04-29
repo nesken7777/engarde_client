@@ -53,9 +53,20 @@ impl<'de> Deserialize<'de> for PlayerID {
             {
                 self.visit_str(v.as_str())
             }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    0 => Ok(PlayerID::Zero),
+                    1 => Ok(PlayerID::One),
+                    _ => Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self)),
+                }
+            }
         }
 
-        deserializer.deserialize_string(MyEnumVisitor)
+        deserializer.deserialize_any(MyEnumVisitor)
     }
 }
 
