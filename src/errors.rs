@@ -4,7 +4,7 @@ use std::{fmt::Display, io, num::ParseIntError};
 #[derive(Debug)]
 pub enum Errors {
     IO(io::Error),
-    MessageParse(ParseMessageError),
+    ParseMessage(ParseMessageError),
     ParseInt(ParseIntError),
     Serde(serde_json::Error),
     Other(&'static str),
@@ -17,7 +17,7 @@ impl Display for Errors {
         const ERROR_MESSAGE: &str = "エラー発生した:";
         match self {
             IO(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
-            MessageParse(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
+            ParseMessage(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
             ParseInt(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
             Serde(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
             Other(e) => write!(f, "{} {}", ERROR_MESSAGE, e),
@@ -33,7 +33,7 @@ impl From<io::Error> for Errors {
 
 impl From<ParseMessageError> for Errors {
     fn from(value: ParseMessageError) -> Self {
-        MessageParse(value)
+        ParseMessage(value)
     }
 }
 
