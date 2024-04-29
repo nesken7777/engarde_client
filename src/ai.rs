@@ -292,12 +292,6 @@ pub fn ai_main() -> Result<(), Errors> {
         &mut SinkStates {},
         &RandomExploration::new(),
     );
-    let filename = format!("learned{}.json", id.denote());
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(filename)?;
     let exported = trainer.export_learned_values();
 
     // ごめん、ここはね、HashMapのままだとキーが文字列じゃないからjsonにできないんで、構造体のまま文字列化する処理です
@@ -315,6 +309,12 @@ pub fn ai_main() -> Result<(), Errors> {
             Ok((state_str, action_str_map))
         })
         .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
+    let filename = format!("learned{}.json", id.denote());
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(filename)?;
     file.write_all(serde_json::to_string(&converted)?.as_bytes())?;
 
     Ok(())
