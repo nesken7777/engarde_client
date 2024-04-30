@@ -261,7 +261,6 @@ pub fn ai_main() -> Result<(), Errors> {
         bufwriter,
     );
 
-
     // ファイル読み込み
     let path = format!("learned{}.json", id.denote());
     let mut trainer = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
