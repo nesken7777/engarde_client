@@ -297,9 +297,9 @@ pub struct RoundEnd {
     )]
     pub round_winner: i8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
@@ -315,9 +315,9 @@ pub struct GameEnd {
     #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
     pub winner: u8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
