@@ -125,6 +125,13 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
+    print(
+        format!(
+            "p0: {}, p1: {}",
+            board.player_position_0, board.player_position_1
+        )
+        .as_str(),
+    )?;
     print(format!("手札:{:?}", player.hand).as_str())?;
     loop {
         print("どっちのアクションにする?")?;
