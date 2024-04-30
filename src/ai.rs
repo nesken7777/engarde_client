@@ -9,7 +9,7 @@ use std::{
 
 use rurel::{
     mdp::{Agent, State},
-    strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
+    strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
     AgentTrainer,
 };
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,26 @@ use crate::{
     },
     read_keyboard, read_stream, send_info,
 };
+
+struct BestExploration(AgentTrainer<MyState>);
+
+impl BestExploration {
+    pub fn new(trainer: AgentTrainer<MyState>) -> BestExploration {
+        BestExploration(trainer)
+    }
+}
+
+impl ExplorationStrategy<MyState> for BestExploration {
+    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        match self.0.best_action(agent.current_state()) {
+            None => agent.pick_random_action(),
+            Some(action) => {
+                agent.take_action(&action);
+                action
+            }
+        }
+    }
+}
 
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
@@ -307,13 +327,15 @@ pub fn ai_main() -> Result<(), Errors> {
     } else {
         AgentTrainer::new()
     };
-
     //トレーニング開始
+
+    let mut trainer2 = AgentTrainer::new();
+    trainer2.import_state(trainer.export_learned_values());
     trainer.train(
         &mut agent,
         &QLearning::new(0.2, 0.9, 0.0),
         &mut SinkStates {},
-        &RandomExploration::new(),
+        &BestExploration::new(trainer2),
     );
     let exported = trainer.export_learned_values();
 
