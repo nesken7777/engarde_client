@@ -179,42 +179,59 @@ impl Agent<MyState> for MyAgent {
         use Messages::*;
         //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> Result<(), Errors> {
-            match Messages::parse(&read_stream(&mut self.reader)?) {
-                Ok(messages) => match messages {
-                    BoardInfo(board_info) => {
-                        (self.state.my_position, self.state.enemy_position) = match self.state.my_id
-                        {
-                            PlayerID::Zero => {
-                                (board_info.player_position_0, board_info.player_position_1)
-                            }
-                            PlayerID::One => {
-                                (board_info.player_position_1, board_info.player_position_0)
-                            }
-                        };
+            loop {
+                match Messages::parse(&read_stream(&mut self.reader)?) {
+                    Ok(messages) => match messages {
+                        BoardInfo(board_info) => {
+                            (self.state.my_position, self.state.enemy_position) =
+                                match self.state.my_id {
+                                    PlayerID::Zero => {
+                                        (board_info.player_position_0, board_info.player_position_1)
+                                    }
+                                    PlayerID::One => {
+                                        (board_info.player_position_1, board_info.player_position_0)
+                                    }
+                                };
+                        }
+                        HandInfo(hand_info) => {
+                            self.state.hands = hand_info.to_vec();
+                            break;
+                        }
+                        Accept(_) => {
+                            break;
+                        }
+                        DoPlay(_) => {
+                            send_info(&mut self.writer, &Evaluation::new())?;
+                            send_action(&mut self.writer, action)?;
+                            break;
+                        }
+                        ServerError(e) => {
+                            print("エラーもらった")?;
+                            print(format!("{:?}", e).as_str())?;
+                            break;
+                        }
+                        Played(played) => {
+                            algorithm::used_card(&mut self.state.cards, played);
+                            break;
+                        }
+                        RoundEnd(round_end) => {
+                            print(
+                                format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str(),
+                            )?;
+                            self.state.cards = RestCards::new();
+                            break;
+                        }
+                        GameEnd(game_end) => {
+                            print(format!("ゲーム終わり! 勝者:{}", game_end.winner).as_str())?;
+                            self.state.game_end = true;
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        print("JSON解析できなかった")?;
+                        print(format!("{}", e).as_str())?;
+                        break;
                     }
-                    HandInfo(hand_info) => self.state.hands = hand_info.to_vec(),
-                    Accept(_) => (),
-                    DoPlay(_) => {
-                        send_info(&mut self.writer, &Evaluation::new())?;
-                        send_action(&mut self.writer, action)?;
-                    }
-                    ServerError(e) => {
-                        print("エラーもらった")?;
-                        print(format!("{:?}", e).as_str())?;
-                    }
-                    Played(played) => algorithm::used_card(&mut self.state.cards, played),
-                    RoundEnd(round_end) => {
-                        print(format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str())?;
-                        self.state.cards = RestCards::new();
-                    }
-                    GameEnd(game_end) => {
-                        print(format!("ゲーム終わり! 勝者:{}", game_end.winner).as_str())?;
-                        self.state.game_end = true;
-                    }
-                },
-                Err(e) => {
-                    print("JSON解析できなかった")?;
-                    print(format!("{}", e).as_str())?;
                 }
             }
             Ok(())
