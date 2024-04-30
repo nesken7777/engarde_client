@@ -6,15 +6,14 @@ use ai::ai_main;
 use algorithm::RestCards;
 use errors::Errors;
 use protocol::{
-    Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
-    PlayAttack, PlayMovement, PlayerID, PlayerName, PlayerProperty,
+    Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Movement, PlayAttack,
+    PlayMovement, PlayerID, PlayerProperty,
 };
 use serde::Serialize;
 use std::{
     io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    net::TcpStream,
 };
-use Messages::*;
 
 fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();

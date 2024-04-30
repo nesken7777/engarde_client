@@ -3,7 +3,7 @@ use std::{
     fs::OpenOptions,
     hash::RandomState,
     io::{BufReader, BufWriter, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    net::{SocketAddr, TcpStream},
     ops::Neg,
 };
 
