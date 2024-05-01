@@ -53,6 +53,7 @@ struct MyState {
     my_id: PlayerID,
     hands: Vec<u8>,
     cards: RestCards,
+    winner: Option<bool>,
     my_position: u8,
     enemy_position: u8,
     game_end: bool,
@@ -64,9 +65,14 @@ impl State for MyState {
         // Negative Euclidean distance
         let distance = (self.enemy_position as i8 - self.my_position as i8).abs();
         let rokutonokyori = (6 - distance).abs();
-        let point1 = rokutonokyori.neg() as f64;
+        let point1 = (rokutonokyori as f64 * 10.0).powi(2).neg();
         let point2 = if distance < 6 { -1.0 } else { 0.0 };
-        [point1, point2].into_iter().sum()
+        let point3 = match self.winner {
+            None => 0.0,
+            Some(true) => 200000.0,
+            Some(false) => -200000.0,
+        };
+        [point1, point2, point3].into_iter().sum()
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
@@ -177,6 +183,7 @@ impl MyAgent {
                 my_id: id,
                 hands,
                 cards: RestCards::new(),
+                winner: None,
                 my_position,
                 enemy_position,
                 game_end: false,
@@ -197,6 +204,9 @@ impl Agent<MyState> for MyAgent {
             }
         }
         use Messages::*;
+        if self.state.winner.is_some() {
+            self.state.winner = None;
+        }
         //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> Result<(), Errors> {
             loop {
@@ -235,9 +245,14 @@ impl Agent<MyState> for MyAgent {
                             break;
                         }
                         RoundEnd(round_end) => {
-                            print(
-                                format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str(),
-                            )?;
+                            // print(
+                            //     format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str(),
+                            // )?;
+                            self.state.winner = match round_end.round_winner {
+                                -1 => None,
+                                x if x as u8 == self.state.my_id.denote() => Some(true),
+                                _ => Some(false),
+                            };
                             self.state.cards = RestCards::new();
                             break;
                         }
@@ -249,6 +264,13 @@ impl Agent<MyState> for MyAgent {
                     },
                     Err(e) => {
                         print("JSON解析できなかった")?;
+                        if let Errors::Serde(ref e) = e {
+                            match e.io_error_kind() {
+                                Some(std::io::ErrorKind::UnexpectedEof) => panic!("EOFでpanic"),
+                                Some(_) => {}
+                                None => {}
+                            }
+                        }
                         print(format!("{}", e).as_str())?;
                         break;
                     }
