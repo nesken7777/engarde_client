@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
     hash::RandomState,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
     ops::Neg,
 };
@@ -16,9 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     algorithm::{self, RestCards},
-    connect,
     errors::Errors,
-    print,
+    get_id, print,
     protocol::{
         self, Action, BoardInfo,
         Direction::{Back, Forward},
@@ -197,7 +196,7 @@ impl Agent<MyState> for MyAgent {
         &self.state
     }
     fn take_action(&mut self, action: &Action) {
-        fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) -> Result<(), Errors> {
+        fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) -> io::Result<()> {
             match action {
                 Action::Move(m) => send_info(writer, &PlayMovement::from_info(*m)),
                 Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)),
@@ -208,7 +207,7 @@ impl Agent<MyState> for MyAgent {
             self.state.winner = None;
         }
         //selfキャプチャしたいからクロージャで書いてる
-        let mut take_action_result = || -> Result<(), Errors> {
+        let mut take_action_result = || -> io::Result<()> {
             loop {
                 match Messages::parse(&read_stream(&mut self.reader)?) {
                     Ok(messages) => match messages {
@@ -287,14 +286,14 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
-pub fn ai_main() -> Result<(), Errors> {
+pub fn ai_main() -> io::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     print("connect?")?;
     read_keyboard()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    let id = connect(&mut bufreader)?;
+    let id = get_id(&mut bufreader)?;
     let player_name = PlayerName::new("qai".to_string());
     send_info(&mut bufwriter, &player_name)?;
     let _ = read_stream(&mut bufreader)?;
@@ -302,11 +301,14 @@ pub fn ai_main() -> Result<(), Errors> {
     // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
     let mut board_info_init = BoardInfo::new();
     let hand_info = loop {
-        let message = Messages::parse(&read_stream(&mut bufreader)?)?;
-        if let Messages::HandInfo(hand_info) = message {
-            break hand_info;
-        } else if let Messages::BoardInfo(board_info) = message {
-            board_info_init = board_info;
+        match Messages::parse(&read_stream(&mut bufreader)?) {
+            Ok(Messages::BoardInfo(board_info)) => {
+                board_info_init = board_info;
+            }
+            Ok(Messages::HandInfo(hand_info)) => {
+                break hand_info;
+            }
+            Ok(_) | Err(_) => {}
         }
     };
 
