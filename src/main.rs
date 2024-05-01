@@ -4,7 +4,6 @@ mod errors;
 mod protocol;
 use ai::ai_main;
 use algorithm::RestCards;
-use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Movement, PlayAttack,
     PlayMovement, PlayerID, PlayerProperty,
@@ -38,21 +37,21 @@ where
     Ok(string.trim().to_string())
 }
 
-fn connect<T>(bufreader: &mut BufReader<T>) -> Result<PlayerID, Errors>
+fn get_id<T>(bufreader: &mut BufReader<T>) -> io::Result<PlayerID>
 where
     T: Read,
 {
     let string = read_stream(bufreader)?;
-    let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
+    let connection_start = serde_json::from_str::<ConnectionStart>(&string).expect("来たものがConnectionStartじゃない");
     Ok(connection_start.client_id)
 }
 
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
+fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> io::Result<()>
 where
     W: Write,
     T: Serialize,
 {
-    let string = format!("{}\r\n", serde_json::to_string(info)?);
+    let string = format!("{}\r\n", serde_json::to_string(info).unwrap());
     writer.write_all(string.as_bytes())?;
     writer.flush()?;
     Ok(())
@@ -126,6 +125,13 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
+    print(
+        format!(
+            "p0: {}, p1: {}",
+            board.player_position_0, board.player_position_1
+        )
+        .as_str(),
+    )?;
     print(format!("手札:{:?}", player.hand).as_str())?;
     loop {
         print("どっちのアクションにする?")?;
@@ -153,7 +159,7 @@ fn act(
     my_info: &PlayerProperty,
     board_state: &BoardInfo,
     bufwriter: &mut BufWriter<TcpStream>,
-) -> Result<(), Errors> {
+) -> io::Result<()> {
     let evaluation = Evaluation::new();
     send_info(bufwriter, &evaluation)?;
     let action = ask_action(my_info, board_state)?;
@@ -171,7 +177,7 @@ fn act(
     Ok(())
 }
 
-fn main() -> Result<(), Errors> {
+fn main() -> io::Result<()> {
     // // IPアドレスはいつか標準入力になると思います。
     // let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
     // print("connect?")?;
@@ -179,7 +185,7 @@ fn main() -> Result<(), Errors> {
     // let stream = TcpStream::connect(addr)?;
     // let (mut bufreader, mut bufwriter) =
     //     (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    // let id = connect(&mut bufreader)?;
+    // let id = get_id(&mut bufreader)?;
     // let mut my_info = PlayerProperty::new(id);
     // {
     //     // ここはどうする?標準入力にする?

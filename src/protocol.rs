@@ -357,7 +357,7 @@ pub struct ParseMessageError {
 
 impl Display for ParseMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MessageParseError, json is {}", self.invalid_info)
+        write!(f, "ParseMessageError, json is {}", self.invalid_info)
     }
 }
 
@@ -415,11 +415,11 @@ pub struct ConnectionStart {
 #[derive(Serialize)]
 pub struct PlayerName {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "Name")]
     pub name: String,
 }
@@ -427,9 +427,9 @@ pub struct PlayerName {
 impl PlayerName {
     pub fn new(name: String) -> Self {
         PlayerName {
-            typ: "PlayerName".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
+            typ: "PlayerName",
+            from: "Client",
+            to: "Server",
             name,
         }
     }
@@ -438,22 +438,22 @@ impl PlayerName {
 #[derive(Deserialize, Debug)]
 pub struct NameReceived {
     #[serde(rename = "Type")]
-    typ: String,
+    typ: &'static str,
     #[serde(rename = "From")]
-    from: String,
+    from: &'static str,
     #[serde(rename = "To")]
-    to: String,
+    to: &'static str,
 }
 
 #[skip_serializing_none]
 #[derive(Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "1F")]
     pub eval_1f: Option<String>,
     #[serde(rename = "1B")]
@@ -479,9 +479,9 @@ pub struct Evaluation {
 impl Evaluation {
     pub fn new() -> Self {
         Self {
-            typ: "Evaluation".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
+            typ: "Evaluation",
+            from: "Client",
+            to: "Server",
             eval_1f: Some("1.0".to_string()),
             eval_1b: None,
             eval_2f: None,
@@ -499,13 +499,13 @@ impl Evaluation {
 #[derive(Serialize)]
 pub struct PlayMovement {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "MessageID")]
-    pub message_id: String,
+    pub message_id: &'static str,
     #[serde(rename = "PlayCard")]
     pub play_card: String,
     #[serde(rename = "Direction")]
@@ -515,10 +515,10 @@ pub struct PlayMovement {
 impl PlayMovement {
     pub fn from_info(info: Movement) -> Self {
         PlayMovement {
-            typ: "Play".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
-            message_id: "101".to_string(),
+            typ: "Play",
+            from: "Client",
+            to: "Server",
+            message_id: "101",
             play_card: info.card.to_string(),
             direction: info.direction.to_string(),
         }
@@ -528,13 +528,13 @@ impl PlayMovement {
 #[derive(Serialize)]
 pub struct PlayAttack {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "MessageID")]
-    pub message_id: String,
+    pub message_id: &'static str,
     #[serde(rename = "PlayCard")]
     pub play_card: String,
     #[serde(rename = "NumOfCard")]
@@ -544,10 +544,10 @@ pub struct PlayAttack {
 impl PlayAttack {
     pub fn from_info(info: Attack) -> Self {
         Self {
-            typ: "Play".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
-            message_id: "102".to_string(),
+            typ: "Play",
+            from: "Client",
+            to: "Server",
+            message_id: "102",
             play_card: info.card.to_string(),
             num_of_card: info.quantity.to_string(),
         }
