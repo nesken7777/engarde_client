@@ -355,7 +355,7 @@ pub struct ParseMessageError {
 
 impl Display for ParseMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MessageParseError, json is {}", self.invalid_info)
+        write!(f, "ParseMessageError, json is {}", self.invalid_info)
     }
 }
 
