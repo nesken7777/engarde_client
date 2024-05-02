@@ -223,10 +223,9 @@ impl Agent<MyState> for MyAgent {
                                 };
                         }
                         HandInfo(hand_info) => {
-                            self.state.hands = hand_info.to_vec();
-                            break;
-                        }
-                        Accept(_) => {
+                            let mut hand_vec = hand_info.to_vec();
+                            hand_vec.sort();
+                            self.state.hands = hand_vec;
                             break;
                         }
                         DoPlay(_) => {
@@ -311,11 +310,12 @@ pub fn ai_main() -> io::Result<()> {
             Ok(_) | Err(_) => {}
         }
     };
-
+    let mut hand_vec = hand_info.to_vec();
+    hand_vec.sort();
     // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,
-        hand_info.to_vec(),
+        hand_vec,
         board_info_init.player_position_0,
         board_info_init.player_position_1,
         bufreader,
