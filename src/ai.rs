@@ -297,31 +297,6 @@ pub fn ai_main() -> io::Result<()> {
     send_info(&mut bufwriter, &player_name)?;
     let _ = read_stream(&mut bufreader)?;
 
-    // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-    let mut board_info_init = BoardInfo::new();
-    let hand_info = loop {
-        match Messages::parse(&read_stream(&mut bufreader)?) {
-            Ok(Messages::BoardInfo(board_info)) => {
-                board_info_init = board_info;
-            }
-            Ok(Messages::HandInfo(hand_info)) => {
-                break hand_info;
-            }
-            Ok(_) | Err(_) => {}
-        }
-    };
-    let mut hand_vec = hand_info.to_vec();
-    hand_vec.sort();
-    // AI用エージェント作成
-    let mut agent = MyAgent::new(
-        id,
-        hand_vec,
-        board_info_init.player_position_0,
-        board_info_init.player_position_1,
-        bufreader,
-        bufwriter,
-    );
-
     // ファイル読み込み
     let path = format!("learned{}.json", id.denote());
     let mut trainer = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
@@ -351,10 +326,37 @@ pub fn ai_main() -> io::Result<()> {
     } else {
         AgentTrainer::new()
     };
-    //トレーニング開始
 
+    // ファイルに吐き出された学習内容を取り込む
     let mut trainer2 = AgentTrainer::new();
     trainer2.import_state(trainer.export_learned_values());
+
+    // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+    let mut board_info_init = BoardInfo::new();
+    let hand_info = loop {
+        match Messages::parse(&read_stream(&mut bufreader)?) {
+            Ok(Messages::BoardInfo(board_info)) => {
+                board_info_init = board_info;
+            }
+            Ok(Messages::HandInfo(hand_info)) => {
+                break hand_info;
+            }
+            Ok(_) | Err(_) => {}
+        }
+    };
+    let mut hand_vec = hand_info.to_vec();
+    hand_vec.sort();
+    // AI用エージェント作成
+    let mut agent = MyAgent::new(
+        id,
+        hand_vec,
+        board_info_init.player_position_0,
+        board_info_init.player_position_1,
+        bufreader,
+        bufwriter,
+    );
+
+    //トレーニング開始
     trainer.train(
         &mut agent,
         &QLearning::new(0.2, 0.9, 0.0),
