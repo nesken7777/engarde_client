@@ -228,10 +228,10 @@ impl Agent<MyState> for MyAgent {
                             self.state.hands = hand_vec;
                             break;
                         }
+                        Accept(_) => {}
                         DoPlay(_) => {
                             send_info(&mut self.writer, &Evaluation::new())?;
                             send_action(&mut self.writer, action)?;
-                            break;
                         }
                         ServerError(e) => {
                             print("エラーもらった")?;
