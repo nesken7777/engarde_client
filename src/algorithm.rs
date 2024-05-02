@@ -10,25 +10,25 @@ const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 //残りのカード枚数(種類ごと)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct RestCards {
-    hands: [u8; 5],
+    cards: [u8; 5],
 }
 
 impl RestCards {
     pub fn new() -> Self {
-        Self { hands: [5; 5] }
+        Self { cards: [5; 5] }
     }
 }
 
 impl Index<usize> for RestCards {
     type Output = u8;
     fn index(&self, index: usize) -> &Self::Output {
-        self.hands.get(index).expect("out of bound")
+        self.cards.get(index).expect("out of bound")
     }
 }
 
 impl IndexMut<usize> for RestCards {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.hands.get_mut(index).expect("out of bound")
+        self.cards.get_mut(index).expect("out of bound")
     }
 }
 
