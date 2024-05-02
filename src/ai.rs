@@ -139,7 +139,7 @@ impl State for MyState {
                     .flat_map(|card| {
                         decide_moves(
                             self.my_position + card <= 23,
-                            self.my_position - card > self.enemy_position,
+                            self.my_position.saturating_sub(card) > self.enemy_position,
                             card,
                         )
                     })
