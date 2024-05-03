@@ -10,7 +10,7 @@ use protocol::{
 };
 use serde::Serialize;
 use std::{
-    io::{self, BufRead, BufReader, BufWriter, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     net::{SocketAddr, TcpStream},
 };
 
@@ -28,19 +28,13 @@ fn read_keyboard() -> io::Result<String> {
     Ok(response)
 }
 
-fn read_stream<T>(bufreader: &mut BufReader<T>) -> io::Result<String>
-where
-    T: Read,
-{
+fn read_stream(bufreader: &mut BufReader<TcpStream>) -> io::Result<String> {
     let mut string = String::new();
     bufreader.read_line(&mut string)?;
     Ok(string.trim().to_string())
 }
 
-fn get_id<T>(bufreader: &mut BufReader<T>) -> io::Result<PlayerID>
-where
-    T: Read,
-{
+fn get_id(bufreader: &mut BufReader<TcpStream>) -> io::Result<PlayerID> {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)
         .expect("来たものがConnectionStartじゃない");
