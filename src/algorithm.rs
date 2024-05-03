@@ -1,14 +1,15 @@
 use std::ops::{Index, IndexMut};
 
 use num_rational::Ratio;
+use serde::{Deserialize, Serialize};
 
-use crate::protocol::{BoardInfo, Played};
+use crate::protocol::Played;
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 
 //残りのカード枚数(種類ごと)
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct RestCards {
     cards: [u8; 5],
 }

@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
     Zero,
     One,
@@ -33,7 +33,7 @@ impl<'de> Deserialize<'de> for PlayerID {
             type Value = PlayerID;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("0 or 1")
+                formatter.write_str("0 or 1 or Zero or One")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -43,6 +43,8 @@ impl<'de> Deserialize<'de> for PlayerID {
                 match v.trim() {
                     "0" => Ok(PlayerID::Zero),
                     "1" => Ok(PlayerID::One),
+                    "Zero" => Ok(PlayerID::Zero),
+                    "One" => Ok(PlayerID::One),
                     _ => Err(E::invalid_value(serde::de::Unexpected::Str(v), &self)),
                 }
             }
@@ -92,12 +94,12 @@ pub struct BoardInfo {
         rename = "PlayerScore_0",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_0: u8,
+    pub player_score_0: u32,
     #[serde(
         rename = "PlayerScore_1",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_1: u8,
+    pub player_score_1: u32,
     #[serde(
         rename = "NumofDeck",
         deserialize_with = "deserialize_number_from_string"
@@ -202,7 +204,7 @@ pub struct Accept {
     message_id: String,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Direction {
     Forward,
     Back,
@@ -217,19 +219,19 @@ impl Display for Direction {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Movement {
     pub card: u8,
     pub direction: Direction,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Attack {
     pub card: u8,
     pub quantity: u8,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Action {
     Move(Movement),
     Attack(Attack),
@@ -295,9 +297,9 @@ pub struct RoundEnd {
     )]
     pub round_winner: i8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
@@ -313,9 +315,9 @@ pub struct GameEnd {
     #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
     pub winner: u8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
