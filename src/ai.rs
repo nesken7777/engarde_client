@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     algorithm::{self, RestCards},
-    errors::Errors,
     get_id, print,
     protocol::{
         self, Action, BoardInfo,
@@ -261,27 +260,13 @@ impl Agent<MyState> for MyAgent {
                         }
                     },
                     Err(e) => {
-                        print("JSON解析できなかった")?;
-                        if let Errors::Serde(ref e) = e {
-                            match e.io_error_kind() {
-                                Some(std::io::ErrorKind::UnexpectedEof) => panic!("EOFでpanic"),
-                                Some(_) => {}
-                                None => {}
-                            }
-                        }
-                        print(format!("{}", e).as_str())?;
-                        break;
+                        panic!("JSON解析できなかった {}", e);
                     }
                 }
             }
             Ok(())
         };
-        match take_action_result() {
-            Ok(_) => (),
-            Err(e) => {
-                print(format!("エラー発生:{}", e).as_str()).ok();
-            }
-        }
+        take_action_result().unwrap();
     }
 }
 
