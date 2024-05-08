@@ -1,33 +1,35 @@
 use std::ops::{Index, IndexMut};
 
 use num_rational::{Ratio,ide};
+use serde::{Deserialize, Serialize};
 
-use crate::protocol::{BoardInfo, Played};
+use crate::protocol::Played;
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 
 //残りのカード枚数(種類ごと)
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct RestCards {
-    hands: [u8; 5],
+    cards: [u8; 5],
 }
 
 impl RestCards {
     pub fn new() -> Self {
-        Self { hands: [5; 5] }
+        Self { cards: [5; 5] }
     }
 }
 
 impl Index<usize> for RestCards {
     type Output = u8;
     fn index(&self, index: usize) -> &Self::Output {
-        self.hands.get(index).expect("out of bound")
+        self.cards.get(index).expect("out of bound")
     }
 }
 
 impl IndexMut<usize> for RestCards {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.hands.get_mut(index).expect("out of bound")
+        self.cards.get_mut(index).expect("out of bound")
     }
 }
 
@@ -156,14 +158,14 @@ pub fn safe_possibility(
                         if 5 - bochi[i] - hands[i] <= (hands[i] - 1) {
                             Ratio::<u64>::from_integer(1)
                         } else {
-                            calc_possibility_move(hands, table, distance - i as i64, true)
+                            calc_possibility_move(hands, table, (distance- i as i64) , true)
                         }
                     }
                     false => {
                         if 5 - bochi[i] - hands[i] <= hands[i] {
                             Ratio::<u64>::ONE
                         } else {
-                            calc_possibility_move(hands, table, distance - i as i64, false)
+                            calc_possibility_move(hands, table, (distance - i as i64) , false)
                         }
                     }
                 })
@@ -229,6 +231,7 @@ fn calc_possibility_move(
     if card_num <= 0 {
         return possibility;
     }
+
     if card_num >= 6 {
         possibility = Ratio::<u64>::from_integer(1);
         return possibility;

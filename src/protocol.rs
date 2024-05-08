@@ -7,10 +7,19 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
     Zero,
     One,
+}
+
+impl PlayerID {
+    pub fn denote(&self) -> u8 {
+        match self {
+            PlayerID::Zero => 0,
+            PlayerID::One => 1,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for PlayerID {
@@ -24,7 +33,7 @@ impl<'de> Deserialize<'de> for PlayerID {
             type Value = PlayerID;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("0 or 1")
+                formatter.write_str("0 or 1 or Zero or One")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -34,6 +43,8 @@ impl<'de> Deserialize<'de> for PlayerID {
                 match v.trim() {
                     "0" => Ok(PlayerID::Zero),
                     "1" => Ok(PlayerID::One),
+                    "Zero" => Ok(PlayerID::Zero),
+                    "One" => Ok(PlayerID::One),
                     _ => Err(E::invalid_value(serde::de::Unexpected::Str(v), &self)),
                 }
             }
@@ -44,9 +55,20 @@ impl<'de> Deserialize<'de> for PlayerID {
             {
                 self.visit_str(v.as_str())
             }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    0 => Ok(PlayerID::Zero),
+                    1 => Ok(PlayerID::One),
+                    _ => Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self)),
+                }
+            }
         }
 
-        deserializer.deserialize_string(MyEnumVisitor)
+        deserializer.deserialize_any(MyEnumVisitor)
     }
 }
 
@@ -72,12 +94,12 @@ pub struct BoardInfo {
         rename = "PlayerScore_0",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_0: u8,
+    pub player_score_0: u32,
     #[serde(
         rename = "PlayerScore_1",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_1: u8,
+    pub player_score_1: u32,
     #[serde(
         rename = "NumofDeck",
         deserialize_with = "deserialize_number_from_string"
@@ -182,7 +204,7 @@ pub struct Accept {
     message_id: String,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Direction {
     Forward,
     Back,
@@ -197,19 +219,19 @@ impl Display for Direction {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Movement {
     pub card: u8,
     pub direction: Direction,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Attack {
     pub card: u8,
     pub quantity: u8,
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Action {
     Move(Movement),
     Attack(Attack),
@@ -275,9 +297,9 @@ pub struct RoundEnd {
     )]
     pub round_winner: i8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
@@ -293,14 +315,14 @@ pub struct GameEnd {
     #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
     pub winner: u8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    pub score_0: u8,
+    pub score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    pub score_1: u8,
+    pub score_1: u32,
     #[serde(rename = "Message")]
     pub message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(rename = "Error")]
 pub struct ServerError {
     #[serde(rename = "Type")]
@@ -335,7 +357,7 @@ pub struct ParseMessageError {
 
 impl Display for ParseMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MessageParseError, json is {}", self.invalid_info)
+        write!(f, "ParseMessageError, json is {}", self.invalid_info)
     }
 }
 
@@ -386,21 +408,18 @@ pub struct ConnectionStart {
     from: String,
     #[serde(rename = "To")]
     to: String,
-    #[serde(
-        rename = "ClientID",
-        deserialize_with = "deserialize_number_from_string"
-    )]
-    pub client_id: u8,
+    #[serde(rename = "ClientID")]
+    pub client_id: PlayerID,
 }
 
 #[derive(Serialize)]
 pub struct PlayerName {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "Name")]
     pub name: String,
 }
@@ -408,9 +427,9 @@ pub struct PlayerName {
 impl PlayerName {
     pub fn new(name: String) -> Self {
         PlayerName {
-            typ: "PlayerName".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
+            typ: "PlayerName",
+            from: "Client",
+            to: "Server",
             name,
         }
     }
@@ -419,22 +438,22 @@ impl PlayerName {
 #[derive(Deserialize, Debug)]
 pub struct NameReceived {
     #[serde(rename = "Type")]
-    typ: String,
+    typ: &'static str,
     #[serde(rename = "From")]
-    from: String,
+    from: &'static str,
     #[serde(rename = "To")]
-    to: String,
+    to: &'static str,
 }
 
 #[skip_serializing_none]
 #[derive(Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "1F")]
     pub eval_1f: Option<String>,
     #[serde(rename = "1B")]
@@ -460,9 +479,9 @@ pub struct Evaluation {
 impl Evaluation {
     pub fn new() -> Self {
         Self {
-            typ: "Evaluation".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
+            typ: "Evaluation",
+            from: "Client",
+            to: "Server",
             eval_1f: Some("1.0".to_string()),
             eval_1b: None,
             eval_2f: None,
@@ -480,13 +499,13 @@ impl Evaluation {
 #[derive(Serialize)]
 pub struct PlayMovement {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "MessageID")]
-    pub message_id: String,
+    pub message_id: &'static str,
     #[serde(rename = "PlayCard")]
     pub play_card: String,
     #[serde(rename = "Direction")]
@@ -496,10 +515,10 @@ pub struct PlayMovement {
 impl PlayMovement {
     pub fn from_info(info: Movement) -> Self {
         PlayMovement {
-            typ: "Play".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
-            message_id: "101".to_string(),
+            typ: "Play",
+            from: "Client",
+            to: "Server",
+            message_id: "101",
             play_card: info.card.to_string(),
             direction: info.direction.to_string(),
         }
@@ -509,13 +528,13 @@ impl PlayMovement {
 #[derive(Serialize)]
 pub struct PlayAttack {
     #[serde(rename = "Type")]
-    pub typ: String,
+    pub typ: &'static str,
     #[serde(rename = "From")]
-    pub from: String,
+    pub from: &'static str,
     #[serde(rename = "To")]
-    pub to: String,
+    pub to: &'static str,
     #[serde(rename = "MessageID")]
-    pub message_id: String,
+    pub message_id: &'static str,
     #[serde(rename = "PlayCard")]
     pub play_card: String,
     #[serde(rename = "NumOfCard")]
@@ -525,10 +544,10 @@ pub struct PlayAttack {
 impl PlayAttack {
     pub fn from_info(info: Attack) -> Self {
         Self {
-            typ: "Play".to_string(),
-            from: "Client".to_string(),
-            to: "Server".to_string(),
-            message_id: "102".to_string(),
+            typ: "Play",
+            from: "Client",
+            to: "Server",
+            message_id: "102",
             play_card: info.card.to_string(),
             num_of_card: info.quantity.to_string(),
         }
@@ -536,16 +555,16 @@ impl PlayAttack {
 }
 
 pub struct PlayerProperty {
-    pub id: u8,
+    pub id: PlayerID,
     pub hand: Vec<u8>,
     pub position: u8,
 }
 
 impl PlayerProperty {
-    pub fn new(id: u8) -> Self {
+    pub fn new(id: PlayerID) -> Self {
         Self {
             id,
-            hand: vec![],
+            hand: Vec::new(),
             position: 0,
         }
     }

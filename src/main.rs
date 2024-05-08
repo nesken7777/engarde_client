@@ -1,18 +1,18 @@
+mod ai;
 mod algorithm;
 mod errors;
 mod protocol;
+use ai::ai_main;
 use algorithm::RestCards;
-use errors::Errors;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
-    PlayAttack, PlayMovement, PlayerName, PlayerProperty,
+    PlayAttack, PlayMovement, PlayerID, PlayerName, PlayerProperty,
 };
 use serde::Serialize;
 use std::{
-    io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    io::{self, BufRead, BufReader, BufWriter, Write},
+    net::{SocketAddr, TcpStream},
 };
-use Messages::*;
 
 fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();
@@ -21,37 +21,32 @@ fn print(string: &str) -> io::Result<()> {
     stdout.flush()
 }
 
-fn read_keybord() -> io::Result<String> {
+fn read_keyboard() -> io::Result<String> {
     let mut word = String::new();
     std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
     Ok(response)
 }
 
-fn read_stream<T>(bufreader: &mut BufReader<T>) -> io::Result<String>
-where
-    T: Read,
-{
+fn read_stream(bufreader: &mut BufReader<TcpStream>) -> io::Result<String> {
     let mut string = String::new();
     bufreader.read_line(&mut string)?;
     Ok(string.trim().to_string())
 }
 
-fn connect<T>(bufreader: &mut BufReader<T>) -> Result<u8, Errors>
-where
-    T: Read,
-{
+fn get_id(bufreader: &mut BufReader<TcpStream>) -> io::Result<PlayerID> {
     let string = read_stream(bufreader)?;
-    let connection_start = serde_json::from_str::<ConnectionStart>(&string)?;
+    let connection_start = serde_json::from_str::<ConnectionStart>(&string)
+        .expect("来たものがConnectionStartじゃない");
     Ok(connection_start.client_id)
 }
 
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> Result<(), Errors>
+fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> io::Result<()>
 where
     W: Write,
     T: Serialize,
 {
-    let string = format!("{}\r\n", serde_json::to_string(info)?);
+    let string = format!("{}\r\n", serde_json::to_string(info).unwrap());
     writer.write_all(string.as_bytes())?;
     writer.flush()?;
     Ok(())
@@ -60,7 +55,7 @@ where
 fn ask_card(player: &PlayerProperty) -> io::Result<u8> {
     loop {
         print("カードはどれにする?")?;
-        let Ok(card) = read_keybord()?.parse::<u8>() else {
+        let Ok(card) = read_keyboard()?.parse::<u8>() else {
             print("それ数字じゃないだろ")?;
             continue;
         };
@@ -77,7 +72,7 @@ fn ask_movement(player: &PlayerProperty) -> io::Result<Action> {
     let card = ask_card(player)?;
     let direction = loop {
         print("どっち向きにする?")?;
-        let string = read_keybord()?;
+        let string = read_keyboard()?;
         match string.as_str() {
             "F" => break Direction::Forward,
             "B" => break Direction::Back,
@@ -110,7 +105,7 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
     let quantity = {
         loop {
             print("何枚使う?")?;
-            let Ok(quantity) = read_keybord()?.parse::<u8>() else {
+            let Ok(quantity) = read_keyboard()?.parse::<u8>() else {
                 print("それ数字じゃないですよ")?;
                 continue;
             };
@@ -125,10 +120,17 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
+    print(
+        format!(
+            "p0: {}, p1: {}",
+            board.player_position_0, board.player_position_1
+        )
+        .as_str(),
+    )?;
     print(format!("手札:{:?}", player.hand).as_str())?;
     loop {
         print("どっちのアクションにする?")?;
-        let string = read_keybord()?;
+        let string = read_keyboard()?;
         match string.as_str() {
             "M" => break ask_movement(player),
             "A" => match ask_attack(player, board) {
@@ -152,7 +154,7 @@ fn act(
     my_info: &PlayerProperty,
     board_state: &BoardInfo,
     bufwriter: &mut BufWriter<TcpStream>,
-) -> Result<(), Errors> {
+) -> io::Result<()> {
     let evaluation = Evaluation::new();
     send_info(bufwriter, &evaluation)?;
     let action = ask_action(my_info, board_state)?;
@@ -170,20 +172,20 @@ fn act(
     Ok(())
 }
 
-fn main() -> Result<(), Errors> {
+fn interact_main() -> io::Result<()> {
     // IPアドレスはいつか標準入力になると思います。
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12052);
+    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     print("connect?")?;
-    read_keybord()?;
+    read_keyboard()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    let id = connect(&mut bufreader)?;
+    let id = get_id(&mut bufreader)?;
     let mut my_info = PlayerProperty::new(id);
     {
         // ここはどうする?標準入力にする?
         print("名前を入力")?;
-        let name = read_keybord()?;
+        let name = read_keyboard()?;
         let player_name = PlayerName::new(name);
         send_info(&mut bufwriter, &player_name)?;
         let _ = read_stream(&mut bufreader)?;
@@ -194,27 +196,26 @@ fn main() -> Result<(), Errors> {
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
-                    BoardInfo(board_info) => {
+                    Messages::BoardInfo(board_info) => {
                         my_info.position = match my_info.id {
-                            0 => board_info.player_position_0,
-                            1 => board_info.player_position_1,
-                            _ => unreachable!(),
+                            PlayerID::Zero => board_info.player_position_0,
+                            PlayerID::One => board_info.player_position_1,
                         };
                         board_state = board_info;
                     }
-                    HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
-                    Accept(_) => (),
-                    DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
-                    ServerError(_) => {
+                    Messages::HandInfo(hand_info) => my_info.hand = hand_info.to_vec(),
+                    Messages::Accept(_) => (),
+                    Messages::DoPlay(_) => act(&mut cards, &my_info, &board_state, &mut bufwriter)?,
+                    Messages::ServerError(_) => {
                         print("エラーもらった")?;
                         act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
                     }
-                    Played(played) => algorithm::used_card(&mut cards, played),
-                    RoundEnd(_round_end) => {
+                    Messages::Played(played) => algorithm::used_card(&mut cards, played),
+                    Messages::RoundEnd(_round_end) => {
                         print("ラウンド終わり!")?;
                         cards = RestCards::new();
                     }
-                    GameEnd(_game_end) => {
+                    Messages::GameEnd(_game_end) => {
                         break;
                     }
                 },
@@ -226,4 +227,12 @@ fn main() -> Result<(), Errors> {
         }
     }
     Ok(())
+}
+
+fn main() -> io::Result<()> {
+    if cfg!(feature = "ai") {
+        ai_main()
+    } else {
+        interact_main()
+    }
 }
