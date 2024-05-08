@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 num-rational = "0.4.1"
+num-traits = "0.2.19"
 rurel = "0.5.1"
 serde = { version = "1.0.197", features = ["derive"] }
 serde-aux = { version = "4.5.0", default-features = false }
