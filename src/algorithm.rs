@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use num_rational::Ratio;
+use num_rational::{Ratio,ide};
 
 use crate::protocol::{BoardInfo, Played};
 
@@ -129,7 +129,7 @@ pub enum Status {
 //返り値はそのカードでアタックまたは行動を行ったときの安全な確率。
 pub fn safe_possibility(
     distance: i64,
-    unvisible: &[u64],
+    bochi: &[u64],
     hands: &[u64],
     table: &ProbabilityTable,
     status: Status,
@@ -137,7 +137,7 @@ pub fn safe_possibility(
     match status {
         Status::Attack => (0..5)
             .map(|i| {
-                if 5 - unvisible[i] - hands[i] <= hands[i] {
+                if 5 - bochi[i] - hands[i] <= hands[i] {
                     Ratio::<u64>::from_integer(100)
                 } else {
                     calc_possibility_attack(hands, table, i as u64)
@@ -147,22 +147,23 @@ pub fn safe_possibility(
             .try_into()
             .unwrap(),
         Status::Forward => {
-            let duplicate = check_dup(distance as u64);
+            let duplicate = check_twice(distance as u64);
 
             (0..5)
                 .map(|i| match duplicate[i] {
                     true => {
-                        if 5 - unvisible[i] - hands[i] <= (hands[i] - 1) {
-                            Ratio::<u64>::from_integer(100)
+                        
+                        if 5 - bochi[i] - hands[i] <= (hands[i] - 1) {
+                            Ratio::<u64>::from_integer(1)
                         } else {
-                            calc_possibility_move(hands, table, (distance- i as i64) , true)
+                            calc_possibility_move(hands, table, distance - i as i64, true)
                         }
                     }
                     false => {
-                        if 5 - unvisible[i] - hands[i] <= hands[i] {
-                            Ratio::<u64>::from_integer(100)
+                        if 5 - bochi[i] - hands[i] <= hands[i] {
+                            Ratio::<u64>::ONE
                         } else {
-                            calc_possibility_move(hands, table, (distance - i as i64) , false)
+                            calc_possibility_move(hands, table, distance - i as i64, false)
                         }
                     }
                 })
@@ -172,7 +173,7 @@ pub fn safe_possibility(
         }
         Status::Backward => (0..5)
             .map(|i| {
-                if 5 - unvisible[i] - hands[i] <= hands[i] {
+                if 5 - bochi[i] - hands[i] <= hands[i] {
                     Ratio::<u64>::from_integer(100)
                 } else {
                     calc_possibility_move(hands, table, (distance + i as i64), false)
@@ -185,97 +186,36 @@ pub fn safe_possibility(
 }
 
 //勝負したい距離につめるためにその距離の手札を使わなければいけないかどうか
-fn check_dup(distance: u64) -> [bool; 5] {
-    let mut arr = [false; 5];
-    let mut i = 0;
-    while i < 5 {
-        if distance - (i * 2) == 0 {
-            arr[i as usize] = true;
-        }
-        i += 1;
-    }
-    arr
+fn check_twice(distance: u64) -> [bool; 5] {
+    // let mut arr = [false; 5];
+    // let mut i = 0;
+    // while i < 5 {
+    //     if distance - (i * 2) == 0 {
+    //         arr[i as usize] = true;
+    //     }
+    //     i += 1;
+    // }
+    // arr;
+    (0..5)
+        .map(|i| distance - (i * 2) == 0)
+        .collect::<Vec<bool>>()
+        .try_into()
+        .unwrap()
 }
-//自分の手札に相手にどの距離で勝負可能かを示す
-fn check_reacheable(hands: &[u64], distance: u64) -> [bool; 5] {
-    let mut arr = [false; 5];
-    let mut i: usize = 0;
-    while i < 5 {
-        match distance - i as u64 {
-            1 => {
-                if hands[i] != 0 {
-                    arr[0] = true
-                }
-            }
-            2 => {
-                if hands[i] != 0 {
-                    arr[1] = true
-                }
-            }
-            3 => {
-                if hands[i] != 0 {
-                    arr[2] = true
-                }
-            }
-            4 => {
-                if hands[i] != 0 {
-                    arr[3] = true
-                }
-            }
-            5 => {
-                if hands[i] != 0 {
-                    arr[4] = true
-                }
-            }
-            _ => (),
-        }
-        i += 1;
-    }
-    while i < 5 {
-        match distance + i as u64 {
-            1 => {
-                if hands[i] != 0 {
-                    arr[0] = true
-                }
-            }
-            2 => {
-                if hands[i] != 0 {
-                    arr[1] = true
-                }
-            }
-            3 => {
-                if hands[i] != 0 {
-                    arr[2] = true
-                }
-            }
-            4 => {
-                if hands[i] != 0 {
-                    arr[3] = true
-                }
-            }
-            5 => {
-                if hands[i] != 0 {
-                    arr[4] = true
-                }
-            }
-            _ => (),
-        }
-        i += 1;
-    }
-    arr
-}
-//safe_possibilityで使う計算過程
+
+//アタックするとき、相手にパリーされても安全な確率。兼相手が自分の枚数以下を持っている確率
 fn calc_possibility_attack(hands: &[u64], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
-    let mut possibility = Ratio::<u64>::from_integer(0);
-    let mut j: usize = 0;
-    let mut i = 0;
-    while i < 3 {
-        if hands[card_num as usize] >= i {
-            possibility += table.access(card_num as u8, i as usize).unwrap();
-        }
-        i += 1;
-    }
-    possibility
+    // なぜ3なのかというと、3枚の攻撃の時点で勝負が決まるから
+    //enemy_quantは相手のカード枚数
+    (0..3)
+        .map(|enemy_quant| {
+            if hands[card_num as usize] >= enemy_quant {
+                table.access(card_num as u8, enemy_quant as usize).unwrap()
+            } else {
+                Ratio::<u64>::from_integer(0)
+            }
+        })
+        .sum()
 }
 
 fn calc_possibility_move(
@@ -286,12 +226,12 @@ fn calc_possibility_move(
 ) -> Ratio<u64> {
     let mut possibility = Ratio::<u64>::from_integer(0);
     let mut i = 0;
-    if card_num<=0{
-        return possibility
+    if card_num <= 0 {
+        return possibility;
     }
-    if card_num>=6{
-        possibility=Ratio::<u64>::from_integer(1);
-        return possibility
+    if card_num >= 6 {
+        possibility = Ratio::<u64>::from_integer(1);
+        return possibility;
     }
     match dup {
         true => {
@@ -312,4 +252,8 @@ fn calc_possibility_move(
         }
     }
     possibility
+}
+pub struct Consequence {
+    status: Status,
+    cards: u64,
 }
