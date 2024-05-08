@@ -1,9 +1,9 @@
+use num_rational::Ratio;
+use num_traits::identities::{One, Zero};
+use serde::{Deserialize, Serialize};
 use std::ops::{Index, IndexMut};
 
-use num_rational::{Ratio,ide};
-use serde::{Deserialize, Serialize};
-
-use crate::protocol::Played;
+use crate::protocol::{Action, Direction, Movement, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
@@ -134,10 +134,10 @@ pub fn safe_possibility(
     bochi: &[u64],
     hands: &[u64],
     table: &ProbabilityTable,
-    status: Status,
+    action: Action,
 ) -> [Ratio<u64>; 5] {
-    match status {
-        Status::Attack => (0..5)
+    match action {
+        Action::Attack(_) => (0..5)
             .map(|i| {
                 if 5 - bochi[i] - hands[i] <= hands[i] {
                     Ratio::<u64>::from_integer(100)
@@ -148,24 +148,28 @@ pub fn safe_possibility(
             .collect::<Vec<Ratio<u64>>>()
             .try_into()
             .unwrap(),
-        Status::Forward => {
+        Action::Move(Movement {
+            card: _,
+            direction: Direction::Forward,
+        }) => {
+            // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
+            // そのような、相手がn-1枚以下を持っているような確率の総和
             let duplicate = check_twice(distance as u64);
 
             (0..5)
                 .map(|i| match duplicate[i] {
                     true => {
-                        
                         if 5 - bochi[i] - hands[i] <= (hands[i] - 1) {
-                            Ratio::<u64>::from_integer(1)
+                            Ratio::<u64>::one()
                         } else {
-                            calc_possibility_move(hands, table, (distance- i as i64) , true)
+                            calc_possibility_move(hands, table, distance - i as i64, true)
                         }
                     }
                     false => {
                         if 5 - bochi[i] - hands[i] <= hands[i] {
-                            Ratio::<u64>::ONE
+                            Ratio::<u64>::one()
                         } else {
-                            calc_possibility_move(hands, table, (distance - i as i64) , false)
+                            calc_possibility_move(hands, table, distance - i as i64, false)
                         }
                     }
                 })
@@ -173,12 +177,15 @@ pub fn safe_possibility(
                 .try_into()
                 .unwrap()
         }
-        Status::Backward => (0..5)
+        Action::Move(Movement {
+            card: _,
+            direction: Direction::Back,
+        }) => (0..5)
             .map(|i| {
                 if 5 - bochi[i] - hands[i] <= hands[i] {
-                    Ratio::<u64>::from_integer(100)
+                    Ratio::<u64>::one()
                 } else {
-                    calc_possibility_move(hands, table, (distance + i as i64), false)
+                    calc_possibility_move(hands, table, distance + i as i64, false)
                 }
             })
             .collect::<Vec<Ratio<u64>>>()
@@ -227,34 +234,50 @@ fn calc_possibility_move(
     dup: bool,
 ) -> Ratio<u64> {
     let mut possibility = Ratio::<u64>::from_integer(0);
-    let mut i = 0;
-    if card_num <= 0 {
-        return possibility;
-    }
 
-    if card_num >= 6 {
-        possibility = Ratio::<u64>::from_integer(1);
-        return possibility;
-    }
+    // if card_num <= 0 {
+    //     return possibility;
+    // }
+
+    // if card_num >= 6 {
+    //     possibility = Ratio::<u64>::from_integer(1);
+    //     return possibility;
+    // }
     match dup {
         true => {
-            while i < 3 {
-                if (hands[card_num as usize] - 1) >= i {
-                    possibility += table.access(card_num as u8, i as usize).unwrap();
-                }
-                i += 1;
-            }
+            // for i in 0..3 {
+            //     if (hands[card_num as usize] - 1) >= i {
+            //         possibility += table.access(card_num as u8, i as usize).unwrap();
+            //     }
+            // }
+            (0..3)
+                .map(|i| {
+                    if hands[card_num as usize] - 1 >= i {
+                        table.access(card_num as u8, i as usize).unwrap()
+                    } else {
+                        Ratio::<u64>::zero()
+                    }
+                })
+                .sum()
         }
         false => {
-            while i < 3 {
-                if hands[card_num as usize] >= i {
-                    possibility += table.access(card_num as u8, i as usize).unwrap();
-                }
-                i += 1;
-            }
+            // for i in 0..3 {
+            //     if hands[card_num as usize] >= i {
+            //         possibility += table.access(card_num as u8, i as usize).unwrap();
+            //     }
+            // }
+            (0..3)
+                .map(|i| {
+                    if hands[card_num as usize] >= i {
+                        table.access(card_num as u8, i as usize).unwrap()
+                    } else {
+                        Ratio::<u64>::zero()
+                    }
+                })
+                .sum()
         }
     }
-    possibility
+    // possibility
 }
 pub struct Consequence {
     status: Status,
