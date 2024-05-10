@@ -7,16 +7,22 @@ use crate::protocol::{Action, Direction, Movement, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
+const MAX_MAISUU_OF_ID_U8: u8 = 5;
+const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
+const MAX_ID: usize = 5;
+const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
 
 //残りのカード枚数(種類ごと)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct RestCards {
-    cards: [u8; 5],
+    cards: [u8; MAX_ID],
 }
 
 impl RestCards {
     pub fn new() -> Self {
-        Self { cards: [5; 5] }
+        Self {
+            cards: [MAX_MAISUU_OF_ID_U8; MAX_ID],
+        }
     }
 }
 
@@ -35,11 +41,11 @@ impl IndexMut<usize> for RestCards {
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
-    card1: [Ratio<u64>; 6],
-    card2: [Ratio<u64>; 6],
-    card3: [Ratio<u64>; 6],
-    card4: [Ratio<u64>; 6],
-    card5: [Ratio<u64>; 6],
+    card1: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
+    card2: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
+    card3: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
+    card4: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
+    card5: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
 }
 
 impl ProbabilityTable {
@@ -54,7 +60,7 @@ impl ProbabilityTable {
         }
     }
 
-    fn card(&self, i: u8) -> Option<[Ratio<u64>; 6]> {
+    fn card(&self, i: u8) -> Option<[Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1]> {
         match i {
             1 => Some(self.card1),
             2 => Some(self.card2),
@@ -122,101 +128,81 @@ fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<
         .try_into()
         .unwrap()
 }
-pub enum Status {
-    Attack,
-    Forward,
-    Backward,
+
+trait HandsUtil {
+    fn count_cards(&self, card_id: u8) -> u8;
 }
+
+impl HandsUtil for &[u8] {
+    fn count_cards(&self, card_id: u8) -> u8 {
+        self.iter()
+            .filter(|&&i| i == card_id)
+            .count()
+            .try_into()
+            .unwrap()
+    }
+}
+
 //その行動を行った時に安全である確率を求める。distanceは相手との距離、unvisibleは墓地にあるカード枚数、handsは自分の手札、tableは相手が指定されたカードを何枚もっているか保持している構造体、statusは攻撃か動きかを指定する。
 //返り値はそのカードでアタックまたは行動を行ったときの安全な確率。
 pub fn safe_possibility(
-    distance: i64,
-    bochi: &[u64],
-    hands: &[u64],
+    distance: u8,
+    // カード番号がiのやつが墓地に何枚あるかを示す
+    bochi: &[u8],
+    // 手札(ソート済み)
+    hands: &[u8],
     table: &ProbabilityTable,
     action: Action,
-) -> [Ratio<u64>; 5] {
+) -> Ratio<u64> {
     match action {
-        Action::Attack(_) => (0..5)
-            .map(|i| {
-                if 5 - bochi[i] - hands[i] <= hands[i] {
-                    Ratio::<u64>::from_integer(100)
-                } else {
-                    calc_possibility_attack(hands, table, i as u64)
-                }
-            })
-            .collect::<Vec<Ratio<u64>>>()
-            .try_into()
-            .unwrap(),
-        Action::Move(Movement {
-            card: _,
-            direction: Direction::Forward,
-        }) => {
-            // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
-            // そのような、相手がn-1枚以下を持っているような確率の総和
-            let duplicate = check_twice(distance as u64);
-
-            (0..5)
-                .map(|i| match duplicate[i] {
-                    true => {
-                        if 5 - bochi[i] - hands[i] <= (hands[i] - 1) {
-                            Ratio::<u64>::one()
-                        } else {
-                            calc_possibility_move(hands, table, distance - i as i64, true)
-                        }
-                    }
-                    false => {
-                        if 5 - bochi[i] - hands[i] <= hands[i] {
-                            Ratio::<u64>::one()
-                        } else {
-                            calc_possibility_move(hands, table, distance - i as i64, false)
-                        }
-                    }
-                })
-                .collect::<Vec<Ratio<u64>>>()
-                .try_into()
-                .unwrap()
+        Action::Attack(attack) => {
+            let i: usize = attack.card.into();
+            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(attack.card) <= hands.count_cards(attack.card) {
+                Ratio::<u64>::from_integer(100)
+            } else {
+                calc_possibility_attack(hands, table, i as u64)
+            }
         }
         Action::Move(Movement {
-            card: _,
+            card,
+            direction: Direction::Forward,
+        }) => {
+            let i: usize = card.into();
+            // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
+            // そのような、相手がn-1枚以下を持っているような確率の総和
+            let dup = check_twice(distance, card);
+            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(card)
+                <= (hands.count_cards(card) - if dup { 1 } else { 0 })
+            {
+                Ratio::<u64>::one()
+            } else {
+                calc_possibility_move(hands, table, distance - card, dup)
+            }
+        }
+        Action::Move(Movement {
+            card,
             direction: Direction::Back,
-        }) => (0..5)
-            .map(|i| {
-                if 5 - bochi[i] - hands[i] <= hands[i] {
-                    Ratio::<u64>::one()
-                } else {
-                    calc_possibility_move(hands, table, distance + i as i64, false)
-                }
-            })
-            .collect::<Vec<Ratio<u64>>>()
-            .try_into()
-            .unwrap(),
+        }) => {
+            let i: usize = card.into();
+            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(card) <= hands.count_cards(card) {
+                Ratio::<u64>::one()
+            } else {
+                calc_possibility_move(hands, table, distance + card, false)
+            }
+        }
     }
 }
 
 //勝負したい距離につめるためにその距離の手札を使わなければいけないかどうか
-fn check_twice(distance: u64) -> [bool; 5] {
-    // let mut arr = [false; 5];
-    // let mut i = 0;
-    // while i < 5 {
-    //     if distance - (i * 2) == 0 {
-    //         arr[i as usize] = true;
-    //     }
-    //     i += 1;
-    // }
-    // arr;
-    (0..5)
-        .map(|i| distance - (i * 2) == 0)
-        .collect::<Vec<bool>>()
-        .try_into()
-        .unwrap()
+fn check_twice(distance: u8, i: u8) -> bool {
+    distance - (i * 2) == 0
 }
 
 //アタックするとき、相手にパリーされても安全な確率。兼相手が自分の枚数以下を持っている確率
-fn calc_possibility_attack(hands: &[u64], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
+fn calc_possibility_attack(hands: &[u8], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
     // なぜ3なのかというと、3枚の攻撃の時点で勝負が決まるから
     //enemy_quantは相手のカード枚数
-    (0..3)
+    (0..SOKUSHI_U8)
         .map(|enemy_quant| {
             if hands[card_num as usize] >= enemy_quant {
                 table.access(card_num as u8, enemy_quant as usize).unwrap()
@@ -228,58 +214,22 @@ fn calc_possibility_attack(hands: &[u64], table: &ProbabilityTable, card_num: u6
 }
 
 fn calc_possibility_move(
-    hands: &[u64],
+    hands: &[u8],
     table: &ProbabilityTable,
-    card_num: i64,
+    card_num: u8,
     dup: bool,
 ) -> Ratio<u64> {
-    let mut possibility = Ratio::<u64>::from_integer(0);
-
-    // if card_num <= 0 {
-    //     return possibility;
-    // }
-
-    // if card_num >= 6 {
-    //     possibility = Ratio::<u64>::from_integer(1);
-    //     return possibility;
-    // }
-    match dup {
-        true => {
-            // for i in 0..3 {
-            //     if (hands[card_num as usize] - 1) >= i {
-            //         possibility += table.access(card_num as u8, i as usize).unwrap();
-            //     }
-            // }
-            (0..3)
-                .map(|i| {
-                    if hands[card_num as usize] - 1 >= i {
-                        table.access(card_num as u8, i as usize).unwrap()
-                    } else {
-                        Ratio::<u64>::zero()
-                    }
-                })
-                .sum()
-        }
-        false => {
-            // for i in 0..3 {
-            //     if hands[card_num as usize] >= i {
-            //         possibility += table.access(card_num as u8, i as usize).unwrap();
-            //     }
-            // }
-            (0..3)
-                .map(|i| {
-                    if hands[card_num as usize] >= i {
-                        table.access(card_num as u8, i as usize).unwrap()
-                    } else {
-                        Ratio::<u64>::zero()
-                    }
-                })
-                .sum()
-        }
-    }
-    // possibility
+    (0..SOKUSHI_U8)
+        .map(|i| {
+            if hands[card_num as usize] - if dup { 1 } else { 0 } >= i {
+                table.access(card_num, i as usize).unwrap()
+            } else {
+                Ratio::<u64>::zero()
+            }
+        })
+        .sum()
 }
-pub struct Consequence {
-    status: Status,
-    cards: u64,
-}
+// pub struct Consequence {
+//     status: Status,
+//     cards: u64,
+// }

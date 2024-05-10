@@ -84,16 +84,13 @@ impl State for MyState {
         if self.game_end {
             return Vec::new();
         }
-        fn attack_cards(hands: &[u8], card: u8) -> Vec<Action> {
+        fn attack_cards(hands: &[u8], card: u8) -> Action {
             let have = hands.iter().filter(|&&x| x == card).count();
-            (1..=have)
-                .map(|x| {
-                    Action::Attack(protocol::Attack {
-                        card,
-                        quantity: x as u8,
-                    })
-                })
-                .collect()
+
+            Action::Attack(protocol::Attack {
+                card,
+                quantity: have as u8,
+            })
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: u8) -> Vec<Action> {
             match (for_back, for_forward) {
@@ -136,7 +133,10 @@ impl State for MyState {
 
                 [
                     moves,
-                    attack_cards(&self.hands, self.enemy_position - self.my_position),
+                    vec![attack_cards(
+                        &self.hands,
+                        self.enemy_position - self.my_position,
+                    )],
                 ]
                 .concat()
             }
@@ -154,7 +154,10 @@ impl State for MyState {
 
                 [
                     moves,
-                    attack_cards(&self.hands, self.my_position - self.enemy_position),
+                    vec![attack_cards(
+                        &self.hands,
+                        self.my_position - self.enemy_position,
+                    )],
                 ]
                 .concat()
             }
