@@ -136,9 +136,12 @@ impl State for MyState {
 
                 [
                     moves,
-                    attack_cards(&self.hands, self.enemy_position - self.my_position)
-                        .into_iter()
-                        .collect::<Vec<_>>(),
+                    attack_cards(
+                        &self.hands,
+                        self.enemy_position.checked_sub(self.my_position).unwrap(),
+                    )
+                    .into_iter()
+                    .collect::<Vec<_>>(),
                 ]
                 .concat()
             }
@@ -156,9 +159,12 @@ impl State for MyState {
 
                 [
                     moves,
-                    attack_cards(&self.hands, self.enemy_position - self.my_position)
-                        .into_iter()
-                        .collect::<Vec<_>>(),
+                    attack_cards(
+                        &self.hands,
+                        self.my_position.checked_sub(self.enemy_position).unwrap(),
+                    )
+                    .into_iter()
+                    .collect::<Vec<_>>(),
                 ]
                 .concat()
             }
