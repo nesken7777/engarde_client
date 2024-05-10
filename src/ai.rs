@@ -84,13 +84,16 @@ impl State for MyState {
         if self.game_end {
             return Vec::new();
         }
-        fn attack_cards(hands: &[u8], card: u8) -> Action {
+        fn attack_cards(hands: &[u8], card: u8) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
-
-            Action::Attack(protocol::Attack {
-                card,
-                quantity: have as u8,
-            })
+            if have > 0 {
+                Some(Action::Attack(protocol::Attack {
+                    card,
+                    quantity: have as u8,
+                }))
+            } else {
+                None
+            }
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: u8) -> Vec<Action> {
             match (for_back, for_forward) {
@@ -133,10 +136,9 @@ impl State for MyState {
 
                 [
                     moves,
-                    vec![attack_cards(
-                        &self.hands,
-                        self.enemy_position - self.my_position,
-                    )],
+                    attack_cards(&self.hands, self.enemy_position - self.my_position)
+                        .into_iter()
+                        .collect::<Vec<_>>(),
                 ]
                 .concat()
             }
@@ -154,10 +156,9 @@ impl State for MyState {
 
                 [
                     moves,
-                    vec![attack_cards(
-                        &self.hands,
-                        self.my_position - self.enemy_position,
-                    )],
+                    attack_cards(&self.hands, self.enemy_position - self.my_position)
+                        .into_iter()
+                        .collect::<Vec<_>>(),
                 ]
                 .concat()
             }
@@ -353,7 +354,7 @@ pub fn ai_main() -> io::Result<()> {
     //トレーニング開始
     trainer.train(
         &mut agent,
-        &QLearning::new(0.2, 0.3, 0.0),
+        &QLearning::new(0.2, 0.9, 0.0),
         &mut SinkStates {},
         &BestExploration::new(trainer2),
     );

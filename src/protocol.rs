@@ -237,7 +237,7 @@ pub enum Action {
     Attack(Attack),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct PlayedMoveMent {
     #[serde(rename = "Type")]
     typ: String,
@@ -256,7 +256,7 @@ pub struct PlayedMoveMent {
     pub direction: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct PlayedAttack {
     #[serde(rename = "Type")]
     typ: String,
@@ -278,6 +278,7 @@ pub struct PlayedAttack {
     pub num_of_card: u8,
 }
 
+#[derive(Debug)]
 pub enum Played {
     MoveMent(PlayedMoveMent),
     Attack(PlayedAttack),
