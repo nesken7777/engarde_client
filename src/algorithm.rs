@@ -148,7 +148,7 @@ impl HandsUtil for &[u8] {
 pub fn safe_possibility(
     distance: u8,
     // カード番号がiのやつが墓地に何枚あるかを示す
-    bochi: &[u8],
+    rest_cards: &RestCards,
     // 手札(ソート済み)
     hands: &[u8],
     table: &ProbabilityTable,
@@ -157,8 +157,8 @@ pub fn safe_possibility(
     match action {
         Action::Attack(attack) => {
             let i: usize = attack.card.into();
-            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(attack.card) <= hands.count_cards(attack.card) {
-                Ratio::<u64>::from_integer(100)
+            if rest_cards[i] <= hands.count_cards(attack.card) {
+                Ratio::<u64>::one()
             } else {
                 calc_possibility_attack(hands, table, i as u64)
             }
@@ -171,9 +171,7 @@ pub fn safe_possibility(
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
             let dup = check_twice(distance, card);
-            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(card)
-                <= (hands.count_cards(card) - if dup { 1 } else { 0 })
-            {
+            if rest_cards[i] <= (hands.count_cards(card) - if dup { 1 } else { 0 }) {
                 Ratio::<u64>::one()
             } else {
                 calc_possibility_move(hands, table, distance - card, dup)
@@ -184,7 +182,7 @@ pub fn safe_possibility(
             direction: Direction::Back,
         }) => {
             let i: usize = card.into();
-            if MAX_MAISUU_OF_ID_U8 - bochi[i] - hands.count_cards(card) <= hands.count_cards(card) {
+            if rest_cards[i] <= hands.count_cards(card) {
                 Ratio::<u64>::one()
             } else {
                 calc_possibility_move(hands, table, distance + card, false)
@@ -207,7 +205,7 @@ fn calc_possibility_attack(hands: &[u8], table: &ProbabilityTable, card_num: u64
             if hands[card_num as usize] >= enemy_quant {
                 table.access(card_num as u8, enemy_quant as usize).unwrap()
             } else {
-                Ratio::<u64>::from_integer(0)
+                Ratio::<u64>::zero()
             }
         })
         .sum()
