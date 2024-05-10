@@ -1,7 +1,7 @@
 use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 use serde::{Deserialize, Serialize};
-use std::ops::{Index, IndexMut};
+use std::ops::{Deref, Index, IndexMut};
 
 use crate::protocol::{Action, Direction, Movement, Played};
 
@@ -36,6 +36,13 @@ impl Index<usize> for RestCards {
 impl IndexMut<usize> for RestCards {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.cards.get_mut(index).expect("out of bound")
+    }
+}
+
+impl Deref for RestCards {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.cards
     }
 }
 
