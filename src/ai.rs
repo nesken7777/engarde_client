@@ -283,8 +283,6 @@ impl Agent<MyState> for MyAgent {
 
 pub fn ai_main() -> io::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
-    print("connect?")?;
-    read_keyboard()?;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
