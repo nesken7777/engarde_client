@@ -6,6 +6,7 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
     ops::Neg,
+    os::windows::fs::OpenOptionsExt,
 };
 
 use rurel::{
@@ -290,8 +291,9 @@ impl Agent<MyState> for MyAgent {
 }
 
 pub fn ai_main() -> io::Result<()> {
+    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     // ファイル読み込み
-    let path = "learned.json";
+    let path = format!("learned{}.json", id);
     let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
         let mut string = String::new();
         file.read_to_string(&mut string)?;
@@ -318,7 +320,7 @@ pub fn ai_main() -> io::Result<()> {
         HashMap::new()
     };
 
-    let loop_kaisuu = (|| args().nth(1)?.parse::<usize>().ok())().unwrap_or(1);
+    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
 
     for _ in 0..loop_kaisuu {
         let mut trainer = AgentTrainer::new();
@@ -391,7 +393,7 @@ pub fn ai_main() -> io::Result<()> {
             Ok((state_str, action_str_map))
         })
         .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
-    let filename = "learned.json";
+    let filename = format!("learned{}.json", id);
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
