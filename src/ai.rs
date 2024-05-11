@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    env::args,
     fs::OpenOptions,
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
@@ -22,7 +23,7 @@ use crate::{
         Direction::{Back, Forward},
         Evaluation, Messages, Movement, PlayAttack, PlayMovement, PlayerID, PlayerName,
     },
-    read_keyboard, read_stream, send_info,
+    read_stream, send_info,
 };
 
 struct BestExploration(AgentTrainer<MyState>);
@@ -289,26 +290,17 @@ impl Agent<MyState> for MyAgent {
 }
 
 pub fn ai_main() -> io::Result<()> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
-    let stream = TcpStream::connect(addr)?;
-    let (mut bufreader, mut bufwriter) =
-        (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-    let id = get_id(&mut bufreader)?;
-    let player_name = PlayerName::new("qai".to_string());
-    send_info(&mut bufwriter, &player_name)?;
-    let _ = read_stream(&mut bufreader)?;
-
     // ファイル読み込み
-    let path = format!("learned{}.json", id.denote());
-    let mut trainer = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
+    let path = "learned.json";
+    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
         let mut string = String::new();
         file.read_to_string(&mut string)?;
-        let mut agent = AgentTrainer::new();
         let imported =
             serde_json::from_str::<HashMap<String, HashMap<String, f64>>>(string.trim())?;
 
         // ごめん、ここは後述の、文字列化したキーを構造体に戻す作業をしてます
-        let imported = imported
+
+        imported
             .into_iter()
             .map(|(k, v)| {
                 let state = serde_json::from_str(&k)?;
@@ -321,53 +313,67 @@ pub fn ai_main() -> io::Result<()> {
                     .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()?;
                 Ok((state, action_map))
             })
-            .collect::<Result<HashMap<MyState, _>, serde_json::Error>>()?;
-        agent.import_state(imported);
-        agent
+            .collect::<Result<HashMap<MyState, _>, serde_json::Error>>()?
     } else {
-        AgentTrainer::new()
+        HashMap::new()
     };
 
-    // ファイルに吐き出された学習内容を取り込む
-    let mut trainer2 = AgentTrainer::new();
-    trainer2.import_state(trainer.export_learned_values());
+    let loop_kaisuu = (|| args().nth(1)?.parse::<usize>().ok())().unwrap_or(1);
 
-    // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-    let mut board_info_init = BoardInfo::new();
-    let hand_info = loop {
-        match Messages::parse(&read_stream(&mut bufreader)?) {
-            Ok(Messages::BoardInfo(board_info)) => {
-                board_info_init = board_info;
+    for _ in 0..loop_kaisuu {
+        let mut trainer = AgentTrainer::new();
+        trainer.import_state(learned_values);
+
+        // 吐き出された学習内容を取り込む
+        let mut trainer2 = AgentTrainer::new();
+        trainer2.import_state(trainer.export_learned_values());
+
+        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+        let stream = TcpStream::connect(addr)?;
+        let (mut bufreader, mut bufwriter) =
+            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+        let id = get_id(&mut bufreader)?;
+        let player_name = PlayerName::new("qai".to_string());
+        send_info(&mut bufwriter, &player_name)?;
+        let _ = read_stream(&mut bufreader)?;
+
+        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+        let mut board_info_init = BoardInfo::new();
+
+        let hand_info = loop {
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(Messages::BoardInfo(board_info)) => {
+                    board_info_init = board_info;
+                }
+                Ok(Messages::HandInfo(hand_info)) => {
+                    break hand_info;
+                }
+                Ok(_) | Err(_) => {}
             }
-            Ok(Messages::HandInfo(hand_info)) => {
-                break hand_info;
-            }
-            Ok(_) | Err(_) => {}
-        }
-    };
-    let mut hand_vec = hand_info.to_vec();
-    hand_vec.sort();
-    // AI用エージェント作成
-    let mut agent = MyAgent::new(
-        id,
-        hand_vec,
-        board_info_init.player_position_0,
-        board_info_init.player_position_1,
-        bufreader,
-        bufwriter,
-    );
+        };
+        let mut hand_vec = hand_info.to_vec();
+        hand_vec.sort();
+        // AI用エージェント作成
+        let mut agent = MyAgent::new(
+            id,
+            hand_vec,
+            board_info_init.player_position_0,
+            board_info_init.player_position_1,
+            bufreader,
+            bufwriter,
+        );
 
-    //トレーニング開始
-    trainer.train(
-        &mut agent,
-        &QLearning::new(0.2, 0.9, 0.0),
-        &mut SinkStates {},
-        &BestExploration::new(trainer2),
-    );
-    let exported = trainer.export_learned_values();
-
+        //トレーニング開始
+        trainer.train(
+            &mut agent,
+            &QLearning::new(0.2, 0.9, 0.0),
+            &mut SinkStates {},
+            &BestExploration::new(trainer2),
+        );
+        learned_values = trainer.export_learned_values();
+    }
     // ごめん、ここはね、HashMapのままだとキーが文字列じゃないからjsonにできないんで、構造体のまま文字列化する処理です
-    let converted = exported
+    let converted = learned_values
         .into_iter()
         .map(|(k, v)| {
             let state_str = serde_json::to_string(&k)?;
@@ -381,7 +387,7 @@ pub fn ai_main() -> io::Result<()> {
             Ok((state_str, action_str_map))
         })
         .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
-    let filename = format!("learned{}.json", id.denote());
+    let filename = "learned.json";
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
