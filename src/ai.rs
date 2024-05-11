@@ -6,7 +6,6 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
     ops::Neg,
-    os::windows::fs::OpenOptionsExt,
 };
 
 use rurel::{
@@ -53,10 +52,34 @@ struct MyState {
     my_id: PlayerID,
     hands: Vec<u8>,
     cards: RestCards,
-    winner: Option<bool>,
+    p0_score: u32,
+    p1_score: u32,
     my_position: u8,
     enemy_position: u8,
     game_end: bool,
+}
+
+impl MyState {
+    fn my_score(&self) -> u32 {
+        match self.my_id {
+            PlayerID::Zero => self.p0_score,
+            PlayerID::One => self.p1_score,
+        }
+    }
+
+    fn enemy_score(&self) -> u32 {
+        match self.my_id {
+            PlayerID::Zero => self.p1_score,
+            PlayerID::One => self.p0_score,
+        }
+    }
+
+    fn distance_from_center(&self) -> i8 {
+        match self.my_id {
+            PlayerID::Zero => 12 - self.my_position as i8,
+            PlayerID::One => self.my_position as i8 - 12,
+        }
+    }
 }
 
 impl State for MyState {
@@ -68,18 +91,11 @@ impl State for MyState {
         let point1 = (rokutonokyori as f64 * 20.0).powi(2).neg();
         let point2 = if distance < 6 { -100.0 } else { 0.0 };
         let point3 = {
-            let factor = (12.0 - self.my_position as f64) * 10.0;
-            match self.my_id {
-                PlayerID::Zero => factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 },
-                PlayerID::One => factor.powi(2) * if factor < 0.0 { -1.0 } else { 1.0 },
-            }
+            let factor = self.distance_from_center() as f64 * 10.0;
+            factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
         };
         print!("[{point1}, {point2}, {point3}]\r\n");
-        let point4 = match self.winner {
-            None => 0.0,
-            Some(true) => 200000.0,
-            Some(false) => -200000.0,
-        };
+        let point4 = self.my_score() as f64 * 2000.0 - self.enemy_score() as f64 * 2000.0;
         point1 + point2 + point3 + point4
     }
     fn actions(&self) -> Vec<Action> {
@@ -201,7 +217,8 @@ impl MyAgent {
                 my_id: id,
                 hands,
                 cards: RestCards::new(),
-                winner: None,
+                p0_score: 0,
+                p1_score: 0,
                 my_position,
                 enemy_position,
                 game_end: false,
@@ -222,9 +239,6 @@ impl Agent<MyState> for MyAgent {
             }
         }
         use Messages::*;
-        if self.state.winner.is_some() {
-            self.state.winner = None;
-        }
         //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> io::Result<()> {
             loop {
@@ -265,11 +279,11 @@ impl Agent<MyState> for MyAgent {
                             // print(
                             //     format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str(),
                             // )?;
-                            self.state.winner = match round_end.round_winner {
-                                -1 => None,
-                                x if x as u8 == self.state.my_id.denote() => Some(true),
-                                _ => Some(false),
-                            };
+                            match round_end.round_winner {
+                                0 => self.state.p0_score += 1,
+                                1 => self.state.p1_score += 1,
+                                _ => {}
+                            }
                             self.state.cards = RestCards::new();
                             break;
                         }
