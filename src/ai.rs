@@ -322,14 +322,18 @@ pub fn ai_main() -> io::Result<()> {
 
     for _ in 0..loop_kaisuu {
         let mut trainer = AgentTrainer::new();
-        trainer.import_state(learned_values);
+        trainer.import_state(learned_values.clone());
 
         // 吐き出された学習内容を取り込む
         let mut trainer2 = AgentTrainer::new();
-        trainer2.import_state(trainer.export_learned_values());
+        trainer2.import_state(learned_values);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
-        let stream = TcpStream::connect(addr)?;
+        let stream = loop {
+            if let Ok(stream) = TcpStream::connect(addr) {
+                break stream;
+            }
+        };
         let (mut bufreader, mut bufwriter) =
             (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
         let id = get_id(&mut bufreader)?;
