@@ -177,7 +177,11 @@ fn interact_main() -> io::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     print("connect?")?;
     read_keyboard()?;
-    let stream = TcpStream::connect(addr)?;
+    let stream = loop {
+        if let Ok(stream) = TcpStream::connect(addr) {
+            break stream
+        }
+    };
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
     let id = get_id(&mut bufreader)?;
