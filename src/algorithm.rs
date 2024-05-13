@@ -1,7 +1,11 @@
 use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 use serde::{Deserialize, Serialize};
+
 use std::ops::{Deref, Index, IndexMut};
+
+
+
 
 use crate::protocol::{Action, Direction, Movement, Played};
 
@@ -234,7 +238,67 @@ fn calc_possibility_move(
         })
         .sum()
 }
+
 // pub struct Consequence {
 //     status: Status,
 //     cards: u64,
 // }
+
+//ゲームが始まって最初の動きを決定する。基本的に相手と交戦しない限り最も大きいカードを使う。返り値は使うべきカード番号(card_id)
+pub fn initial_move(distance: u64,hands: &[u64])->Option<u64>{
+    // 11よりも距離が大きい場合はsafe_possibilityまたはaiによる処理に任せる
+    if distance<11{
+        None
+    }else{
+        let mut max=0;
+        for i in hands{
+            if hands[*i as usize]!=0{ max = *i;}
+        }
+        Some(max+1)
+    }
+}
+//最後の動きを決定する。(自分が最後動いて距離を決定できる場合)返り値は使うべきカード番号(card_id)
+pub fn last_move(restcards:RestCards,hands: &[u8],position:(i64,i64),parried_quant:u8,table: &ProbabilityTable)->Option<u64>
+{   
+    
+    let distance=position.0-position.1;
+    let mut last: bool=false;
+    //次に自分が行う行動が最後か否か判定。trueなら最後falseなら最後ではない
+    fn check_last(parried_quant: u8,restcards: &RestCards)->bool{
+        if restcards.into_iter().sum::<u8>()<=1+parried_quant{
+            true
+        }
+        else{
+            false
+        }
+    }
+    //自分が行動することで届く距離を求める
+    fn reachable(distance: u64,hands: &[u8])->Vec<u8>{
+        let mut reachable_vec= Vec::new();
+        for i in hands{
+            reachable_vec.push(distance as u8+*i);
+            if distance as i64-*i as i64>=0{
+                reachable_vec.push(distance as u8-*i);
+            }
+        }
+        reachable_vec
+    }
+
+    
+    let can_attack=hands[distance as usize -1]!=0;
+    if can_attack{
+        let possibility=calc_possibility_attack(hands, table, distance as u64);
+        if possibility ==Ratio::one()[
+            return distance
+        ]
+    }
+    last=check_last(parried_quant,&restcards);
+    match last{
+        true=>safe_possibility(distance, rest_cards, hands, table, action);
+
+
+        
+    }
+    
+}
+
