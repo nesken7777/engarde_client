@@ -39,6 +39,7 @@ impl ExplorationStrategy<MyState> for BestExploration {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
             Some(action) => {
+                println!("AIが決めた");
                 agent.take_action(&action);
                 action
             }
