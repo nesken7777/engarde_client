@@ -5,7 +5,6 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
-    ops::Neg,
 };
 
 use rurel::{
@@ -86,18 +85,13 @@ impl MyState {
 impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
-        // Negative Euclidean distance
-        let distance = (self.enemy_position as i8 - self.my_position as i8).abs();
-        let rokutonokyori = (6 - distance).abs();
-        let point1 = (rokutonokyori as f64 * 20.0).powi(2).neg();
-        let point2 = if distance < 6 { -100.0 } else { 0.0 };
         let point3 = {
-            let factor = self.distance_from_center() as f64 * 10.0;
+            let factor = self.distance_from_center() as f64 * 20.0;
             factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
         };
-        print!("[{point1}, {point2}, {point3}]\r\n");
-        let point4 = self.my_score() as f64 * 2000.0 - self.enemy_score() as f64 * 2000.0;
-        point1 + point2 + point3 + point4
+        let point4 = (self.my_score() as f64 * 2000.0).powi(2)
+            - (self.enemy_score() as f64 * 2000.0).powi(2);
+        point3 + point4
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
@@ -387,7 +381,7 @@ pub fn ai_main() -> io::Result<()> {
         //トレーニング開始
         trainer.train(
             &mut agent,
-            &QLearning::new(0.2, 0.9, 0.0),
+            &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
             &BestExploration::new(trainer2),
         );
