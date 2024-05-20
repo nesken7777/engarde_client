@@ -194,7 +194,7 @@ impl LearnedValues {
         let state_map_bytes = self
             .0
             .iter()
-            .map(|(state, action_reward)| -> Vec<u8> {
+            .flat_map(|(state, action_reward)| -> Vec<u8> {
                 let mut hands = state.hands.clone();
                 hands.resize(5, 0);
                 let state_bytes = [
@@ -211,7 +211,7 @@ impl LearnedValues {
                 let act_rwd_len = action_reward.len();
                 let action_reward_bytes = action_reward
                     .iter()
-                    .map(|(action, value)| -> Vec<u8> {
+                    .flat_map(|(action, value)| -> Vec<u8> {
                         match action {
                             Action::Move(movement) => {
                                 let action_bytes =
@@ -224,12 +224,10 @@ impl LearnedValues {
                             }
                         }
                     })
-                    .collect::<Vec<Vec<u8>>>()
-                    .concat();
+                    .collect::<Vec<u8>>();
                 [state_bytes, vec![act_rwd_len as u8], action_reward_bytes].concat()
             })
-            .collect::<Vec<Vec<u8>>>()
-            .concat();
+            .collect::<Vec<u8>>();
         [map_len.to_le_bytes().to_vec(), state_map_bytes].concat()
     }
     fn deserialize(bytes: &[u8]) -> LearnedValues {
@@ -238,6 +236,7 @@ impl LearnedValues {
         let mut state_map: HashMap<MyState, HashMap<Action, f64>> = HashMap::new();
         let mut next_map = state_map_bytes;
         for _ in 0..map_len {
+            //22がマジックナンバーすぎ
             let (state_bytes, next_map_) = next_map.split_at(22);
             next_map = next_map_;
             // Stateを構築するぜ!
@@ -442,27 +441,6 @@ pub fn ai_main() -> io::Result<()> {
     // ファイル読み込み
     let path = format!("learned{}", id);
     let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
-        // let mut string = String::new();
-        // file.read_to_string(&mut string)?;
-        // let imported =
-        //     serde_json::from_str::<HashMap<String, HashMap<String, f64>>>(string.trim())?;
-
-        // // ごめん、ここは後述の、文字列化したキーを構造体に戻す作業をしてます
-
-        // imported
-        //     .into_iter()
-        //     .map(|(k, v)| {
-        //         let state = serde_json::from_str(&k)?;
-        //         let action_map = v
-        //             .into_iter()
-        //             .map(|(k2, v2)| {
-        //                 let action = serde_json::from_str(&k2)?;
-        //                 Ok((action, v2))
-        //             })
-        //             .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()?;
-        //         Ok((state, action_map))
-        //     })
-        //     .collect::<Result<HashMap<MyState, _>, serde_json::Error>>()?
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
         LearnedValues::deserialize(&data).get()
@@ -528,21 +506,6 @@ pub fn ai_main() -> io::Result<()> {
         );
         learned_values = trainer.export_learned_values();
     }
-    // ごめん、ここはね、HashMapのままだとキーが文字列じゃないからjsonにできないんで、構造体のまま文字列化する処理です
-    // let converted = learned_values
-    //     .into_iter()
-    //     .map(|(k, v)| {
-    //         let state_str = serde_json::to_string(&k)?;
-    //         let action_str_map = v
-    //             .into_iter()
-    //             .map(|(k2, v2)| {
-    //                 let action_str = serde_json::to_string(&k2)?;
-    //                 Ok((action_str, v2))
-    //             })
-    //             .collect::<Result<HashMap<String, f64>, serde_json::Error>>()?;
-    //         Ok((state_str, action_str_map))
-    //     })
-    //     .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
     let learned_values = LearnedValues::from_map(learned_values);
     let bytes = learned_values.serialize();
     let filename = format!("learned{}", id);
