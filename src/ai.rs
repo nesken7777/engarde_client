@@ -244,15 +244,22 @@ impl LearnedValues {
         let mut state_map: HashMap<MyState, HashMap<Action, f64>> = HashMap::new();
         let mut next_map = state_map_bytes;
         for _ in 0..map_len {
-            let (state_bytes, next_map) = next_map.split_at(22);
+            let (state_bytes, next_map_) = next_map.split_at(22);
+            next_map = next_map_;
             // Stateを構築するぜ!
             let (my_id_bytes, mut state_rest) = state_bytes.split_at(1);
-            let (hands_bytes, state_rest) = state_rest.split_at(5);
-            let (cards_bytes, state_rest) = state_rest.split_at(5);
-            let (p0_score_bytes, state_rest) = state_rest.split_at(4);
-            let (p1_score_bytes, state_rest) = state_rest.split_at(4);
-            let (my_position_bytes, state_rest) = state_rest.split_at(1);
-            let (enemy_position_bytes, state_rest) = state_rest.split_at(1);
+            let (hands_bytes, state_rest_) = state_rest.split_at(5);
+            state_rest = state_rest_;
+            let (cards_bytes, state_rest_) = state_rest.split_at(5);
+            state_rest = state_rest_;
+            let (p0_score_bytes, state_rest_) = state_rest.split_at(4);
+            state_rest = state_rest_;
+            let (p1_score_bytes, state_rest_) = state_rest.split_at(4);
+            state_rest = state_rest_;
+            let (my_position_bytes, state_rest_) = state_rest.split_at(1);
+            state_rest = state_rest_;
+            let (enemy_position_bytes, state_rest_) = state_rest.split_at(1);
+            state_rest = state_rest_;
             let (game_end_bytes, _) = state_rest.split_at(1);
 
             let state = MyState {
@@ -274,14 +281,19 @@ impl LearnedValues {
                 },
             };
 
-            let (act_rwd_len_bytes, next_map) = next_map.split_at(1);
+            let (act_rwd_len_bytes, next_map_) = next_map.split_at(1);
+            next_map = next_map_;
             let act_rwd_len = act_rwd_len_bytes[0];
             let mut act_rwd_map: HashMap<Action, f64> = HashMap::new();
             for _ in 0..act_rwd_len {
-                let (action_bytes, next_map) = next_map.split_at(1);
-                let (card_bytes, next_map) = next_map.split_at(1);
-                let (property_bytes, next_map) = next_map.split_at(1);
-                let (value_bytes, next_map) = next_map.split_at(8);
+                let (action_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (card_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (property_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (value_bytes, next_map_) = next_map.split_at(8);
+                next_map = next_map_;
                 let action = match action_bytes[0] {
                     0 => {
                         let direction = match property_bytes[0] {
