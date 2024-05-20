@@ -111,7 +111,7 @@ pub fn used_card(cards: &mut RestCards, message: Played) {
         }
         Played::Attack(attack) => {
             let i: usize = attack.play_card.into();
-            cards[i - 1] -= attack.num_of_card * 2;
+            cards[i - 1] = cards[i-1].saturating_sub(attack.num_of_card * 2);
         }
     }
 }
