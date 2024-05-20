@@ -5,8 +5,6 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
-    ops::Neg,
-    vec,
 };
 
 use num_traits::ToBytes;
