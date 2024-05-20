@@ -20,6 +20,13 @@ impl PlayerID {
             PlayerID::One => 1,
         }
     }
+    pub fn from_u8(id:u8)->Option<PlayerID>{
+        match id {
+            0 => Some(PlayerID::Zero),
+            1 => Some(PlayerID::One),
+            _ => None
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for PlayerID {
@@ -208,6 +215,15 @@ pub struct Accept {
 pub enum Direction {
     Forward,
     Back,
+}
+
+impl Direction {
+    pub fn denote(&self) -> u8 {
+        match self {
+            Self::Forward => 0,
+            Self::Back => 1,
+        }
+    }
 }
 
 impl Display for Direction {
