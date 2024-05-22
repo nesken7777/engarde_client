@@ -4,10 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use std::ops::{Deref, Index, IndexMut};
 
-
-
-
-use crate::protocol::{Action, Direction, Movement, Played};
+use crate::protocol::{Action, Attack, Direction, Movement, Played};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
@@ -245,60 +242,100 @@ fn calc_possibility_move(
 // }
 
 //ゲームが始まって最初の動きを決定する。基本的に相手と交戦しない限り最も大きいカードを使う。返り値は使うべきカード番号(card_id)
-pub fn initial_move(distance: u64,hands: &[u64])->Option<u64>{
+pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
     // 11よりも距離が大きい場合はsafe_possibilityまたはaiによる処理に任せる
-    if distance<11{
+    if distance < 11 {
         None
-    }else{
-        let mut max=0;
-        for i in hands{
-            if hands[*i as usize]!=0{ max = *i;}
+    } else {
+        let mut max = 0;
+        for i in hands {
+            if hands[*i as usize] != 0 {
+                max = *i;
+            }
         }
-        Some(max+1)
+        Some(max + 1)
+    }
+}
+pub fn win_poss_attack(
+
+    // カード番号がiのやつが墓地に何枚あるかを示す
+    rest_cards: &RestCards,
+    // 手札(ソート済み)
+    hands: &[u8],
+    table: &ProbabilityTable,
+    action: Action,
+) -> Ratio<u64> {
+    match action {
+        Action::Attack(attack) => {
+            let i: usize = attack.card.into();
+            if rest_cards[i] < hands.count_cards(attack.card) {
+                return Ratio::<u64>::one();
+            } else {
+                return calc_win_possibility(hands, table, i as u64);
+            }
+        }
+        _ => return Ratio::<u64>::zero(),
+    }
+    fn calc_win_possibility(hands: &[u8], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
+        // なぜ3なのかというと、3枚の攻撃の時点で勝負が決まるから
+        //enemy_quantは相手のカード枚数
+        (0..SOKUSHI_U8)
+            .map(|enemy_quant| {
+                if hands[card_num as usize] > enemy_quant {
+                    table.access(card_num as u8, enemy_quant as usize).unwrap()
+                } else {
+                    Ratio::<u64>::zero()
+                }
+            })
+            .sum()
     }
 }
 //最後の動きを決定する。(自分が最後動いて距離を決定できる場合)返り値は使うべきカード番号(card_id)
-pub fn last_move(restcards:RestCards,hands: &[u8],position:(i64,i64),parried_quant:u8,table: &ProbabilityTable)->Option<u64>
-{   
-    
-    let distance=position.0-position.1;
-    let mut last: bool=false;
+pub fn last_move(
+    restcards: RestCards,
+    hands: &[u8],
+    position: (i64, i64),
+    parried_quant: u8,
+    table: &ProbabilityTable,
+) -> Option<u64> {
+    let distance = position.0 - position.1;
+    let mut last: bool = false;
     //次に自分が行う行動が最後か否か判定。trueなら最後falseなら最後ではない
-    fn check_last(parried_quant: u8,restcards: &RestCards)->bool{
-        if restcards.into_iter().sum::<u8>()<=1+parried_quant{
-            true
-        }
-        else{
-            false
-        }
+    fn check_last(parried_quant: u8, restcards: &RestCards) -> bool {
+        restcards.iter().sum::<u8>() <= 1 + parried_quant
     }
-    //自分が行動することで届く距離を求める
-    fn reachable(distance: u64,hands: &[u8])->Vec<u8>{
-        let mut reachable_vec= Vec::new();
-        for i in hands{
-            reachable_vec.push(distance as u8+*i);
-            if distance as i64-*i as i64>=0{
-                reachable_vec.push(distance as u8-*i);
+    //自分が行動することで届く距離を求める。
+    fn reachable(distance: u64, hands: &[u8]) -> Vec<u8> {
+        let mut reachable_vec = Vec::new();
+        for i in hands {
+            reachable_vec.push(distance as u8 + *i);
+            if distance as i64 - *i as i64 >= 0 {
+                reachable_vec.push(distance as u8 - *i);
             }
         }
         reachable_vec
     }
-
-    
-    let can_attack=hands[distance as usize -1]!=0;
-    if can_attack{
-        let possibility=calc_possibility_attack(hands, table, distance as u64);
-        if possibility ==Ratio::one()[
-            return distance
-        ]
-    }
-    last=check_last(parried_quant,&restcards);
-    match last{
-        true=>safe_possibility(distance, rest_cards, hands, table, action);
-
-
+    let mut return_value=None;
+    last = check_last(parried_quant, &restcards);
+    match last {
         
+        true => {
+            
+            let can_attack = hands[distance as usize - 1] != 0;
+            let attack_action = Action::Attack(Attack {
+                card: distance as u8,
+                quantity: hands[distance as usize],
+            });
+            if can_attack {
+                let possibility =
+                    win_poss_attack( &restcards, hands, table, attack_action);
+                if possibility == Ratio::one() {
+                    return_value=Some(distance as u64);
+                }
+            
+        }
+        return_value
     }
-    
+        false => None,
+    }
 }
-

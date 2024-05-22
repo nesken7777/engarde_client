@@ -1,9 +1,11 @@
 mod ai;
+mod algorithm2;
 mod algorithm;
 mod errors;
 mod protocol;
 use ai::ai_main;
 use algorithm::RestCards;
+
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
     PlayAttack, PlayMovement, PlayerID, PlayerName, PlayerProperty,
