@@ -111,6 +111,7 @@ pub fn initial_move(
     //todo:平均にする
 
     let average = calc_ave(hands);
+    //clippyに従うとエラーになった
     if average < Ratio::from_integer(3) {
         return Ok(Action::Move(Movement {
             card: 2,
@@ -125,4 +126,6 @@ pub fn initial_move(
 
 }
 
-pub fn normal_move() {}
+pub fn normal_move() {
+
+}
