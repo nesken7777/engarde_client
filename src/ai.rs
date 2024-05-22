@@ -5,9 +5,9 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
-    ops::Neg,
 };
 
+use num_traits::ToBytes;
 use rurel::{
     mdp::{Agent, State},
     strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
@@ -19,7 +19,7 @@ use crate::{
     algorithm::{self, RestCards},
     get_id, print,
     protocol::{
-        self, Action, BoardInfo,
+        self, Action, Attack, BoardInfo,
         Direction::{Back, Forward},
         Evaluation, Messages, Movement, PlayAttack, PlayMovement, PlayerID, PlayerName,
     },
@@ -39,6 +39,7 @@ impl ExplorationStrategy<MyState> for BestExploration {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
             Some(action) => {
+                println!("AIが決めた");
                 agent.take_action(&action);
                 action
             }
@@ -85,18 +86,13 @@ impl MyState {
 impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
-        // Negative Euclidean distance
-        let distance = (self.enemy_position as i8 - self.my_position as i8).abs();
-        let rokutonokyori = (6 - distance).abs();
-        let point1 = (rokutonokyori as f64 * 20.0).powi(2).neg();
-        let point2 = if distance < 6 { -100.0 } else { 0.0 };
         let point3 = {
-            let factor = self.distance_from_center() as f64 * 10.0;
+            let factor = self.distance_from_center() as f64 * 20.0;
             factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
         };
-        print!("[{point1}, {point2}, {point3}]\r\n");
-        let point4 = self.my_score() as f64 * 2000.0 - self.enemy_score() as f64 * 2000.0;
-        point1 + point2 + point3 + point4
+        let point4 = (self.my_score() as f64 * 2000.0).powi(2)
+            - (self.enemy_score() as f64 * 2000.0).powi(2);
+        point3 + point4
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
@@ -187,6 +183,142 @@ impl State for MyState {
                 .concat()
             }
         }
+    }
+}
+
+struct LearnedValues(HashMap<MyState, HashMap<Action, f64>>);
+
+impl LearnedValues {
+    fn serialize(&self) -> Vec<u8> {
+        let map_len = self.0.len();
+        let state_map_bytes = self
+            .0
+            .iter()
+            .flat_map(|(state, action_reward)| -> Vec<u8> {
+                let mut hands = state.hands.clone();
+                hands.resize(5, 0);
+                let state_bytes = [
+                    vec![state.my_id.denote()],
+                    hands,
+                    state.cards.to_vec(),
+                    state.p0_score.to_le_bytes().to_vec(),
+                    state.p1_score.to_le_bytes().to_vec(),
+                    vec![state.my_position],
+                    vec![state.enemy_position],
+                    vec![state.game_end.into()],
+                ]
+                .concat();
+                let act_rwd_len = action_reward.len();
+                let action_reward_bytes = action_reward
+                    .iter()
+                    .flat_map(|(action, value)| -> Vec<u8> {
+                        match action {
+                            Action::Move(movement) => {
+                                let action_bytes =
+                                    vec![0, movement.card, movement.direction.denote()];
+                                [action_bytes, value.to_le_bytes().to_vec()].concat()
+                            }
+                            Action::Attack(attack) => {
+                                let action_bytes = vec![1, attack.card, attack.quantity];
+                                [action_bytes, value.to_le_bytes().to_vec()].concat()
+                            }
+                        }
+                    })
+                    .collect::<Vec<u8>>();
+                [state_bytes, vec![act_rwd_len as u8], action_reward_bytes].concat()
+            })
+            .collect::<Vec<u8>>();
+        [map_len.to_le_bytes().to_vec(), state_map_bytes].concat()
+    }
+    fn deserialize(bytes: &[u8]) -> LearnedValues {
+        let (map_len_bytes, state_map_bytes) = bytes.split_at(8);
+        let map_len = usize::from_le_bytes(map_len_bytes.try_into().unwrap());
+        let mut state_map: HashMap<MyState, HashMap<Action, f64>> = HashMap::new();
+        let mut next_map = state_map_bytes;
+        for _ in 0..map_len {
+            //22がマジックナンバーすぎ
+            let (state_bytes, next_map_) = next_map.split_at(22);
+            next_map = next_map_;
+            // Stateを構築するぜ!
+            let (my_id_bytes, mut state_rest) = state_bytes.split_at(1);
+            let (hands_bytes, state_rest_) = state_rest.split_at(5);
+            state_rest = state_rest_;
+            let (cards_bytes, state_rest_) = state_rest.split_at(5);
+            state_rest = state_rest_;
+            let (p0_score_bytes, state_rest_) = state_rest.split_at(4);
+            state_rest = state_rest_;
+            let (p1_score_bytes, state_rest_) = state_rest.split_at(4);
+            state_rest = state_rest_;
+            let (my_position_bytes, state_rest_) = state_rest.split_at(1);
+            state_rest = state_rest_;
+            let (enemy_position_bytes, state_rest_) = state_rest.split_at(1);
+            state_rest = state_rest_;
+            let (game_end_bytes, _) = state_rest.split_at(1);
+
+            let state = MyState {
+                my_id: PlayerID::from_u8(my_id_bytes[0]).unwrap(),
+                hands: hands_bytes
+                    .iter()
+                    .filter(|&&x| x != 0)
+                    .copied()
+                    .collect::<Vec<u8>>(),
+                cards: RestCards::from_slice(cards_bytes),
+                p0_score: u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
+                p1_score: u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
+                my_position: my_position_bytes[0],
+                enemy_position: enemy_position_bytes[0],
+                game_end: match game_end_bytes[0] {
+                    0 => false,
+                    1 => true,
+                    _ => panic!(),
+                },
+            };
+
+            let (act_rwd_len_bytes, next_map_) = next_map.split_at(1);
+            next_map = next_map_;
+            let act_rwd_len = act_rwd_len_bytes[0];
+            let mut act_rwd_map: HashMap<Action, f64> = HashMap::new();
+            for _ in 0..act_rwd_len {
+                let (action_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (card_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (property_bytes, next_map_) = next_map.split_at(1);
+                next_map = next_map_;
+                let (value_bytes, next_map_) = next_map.split_at(8);
+                next_map = next_map_;
+                let action = match action_bytes[0] {
+                    0 => {
+                        let direction = match property_bytes[0] {
+                            0 => Forward,
+                            1 => Back,
+                            _ => unreachable!(),
+                        };
+                        Action::Move(Movement {
+                            card: card_bytes[0],
+                            direction,
+                        })
+                    }
+                    1 => Action::Attack(Attack {
+                        card: card_bytes[0],
+                        quantity: property_bytes[0],
+                    }),
+                    _ => unreachable!(),
+                };
+                let value = f64::from_le_bytes(value_bytes.try_into().unwrap());
+                act_rwd_map.insert(action, value);
+            }
+            state_map.insert(state, act_rwd_map);
+        }
+        LearnedValues(state_map)
+    }
+
+    pub fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
+        self.0
+    }
+
+    pub fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
+        LearnedValues(map)
     }
 }
 
@@ -307,29 +439,11 @@ impl Agent<MyState> for MyAgent {
 pub fn ai_main() -> io::Result<()> {
     let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     // ファイル読み込み
-    let path = format!("learned{}.json", id);
+    let path = format!("learned{}", id);
     let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
-        let mut string = String::new();
-        file.read_to_string(&mut string)?;
-        let imported =
-            serde_json::from_str::<HashMap<String, HashMap<String, f64>>>(string.trim())?;
-
-        // ごめん、ここは後述の、文字列化したキーを構造体に戻す作業をしてます
-
-        imported
-            .into_iter()
-            .map(|(k, v)| {
-                let state = serde_json::from_str(&k)?;
-                let action_map = v
-                    .into_iter()
-                    .map(|(k2, v2)| {
-                        let action = serde_json::from_str(&k2)?;
-                        Ok((action, v2))
-                    })
-                    .collect::<Result<HashMap<Action, f64>, serde_json::Error>>()?;
-                Ok((state, action_map))
-            })
-            .collect::<Result<HashMap<MyState, _>, serde_json::Error>>()?
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        LearnedValues::deserialize(&data).get()
     } else {
         HashMap::new()
     };
@@ -386,34 +500,21 @@ pub fn ai_main() -> io::Result<()> {
         //トレーニング開始
         trainer.train(
             &mut agent,
-            &QLearning::new(0.2, 0.9, 0.0),
+            &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
             &BestExploration::new(trainer2),
         );
         learned_values = trainer.export_learned_values();
     }
-    // ごめん、ここはね、HashMapのままだとキーが文字列じゃないからjsonにできないんで、構造体のまま文字列化する処理です
-    let converted = learned_values
-        .into_iter()
-        .map(|(k, v)| {
-            let state_str = serde_json::to_string(&k)?;
-            let action_str_map = v
-                .into_iter()
-                .map(|(k2, v2)| {
-                    let action_str = serde_json::to_string(&k2)?;
-                    Ok((action_str, v2))
-                })
-                .collect::<Result<HashMap<String, f64>, serde_json::Error>>()?;
-            Ok((state_str, action_str_map))
-        })
-        .collect::<Result<HashMap<String, _>, serde_json::Error>>()?;
-    let filename = format!("learned{}.json", id);
+    let learned_values = LearnedValues::from_map(learned_values);
+    let bytes = learned_values.serialize();
+    let filename = format!("learned{}", id);
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
         .open(filename)?;
-    file.write_all(serde_json::to_string(&converted)?.as_bytes())?;
+    file.write_all(&bytes)?;
 
     Ok(())
 }
