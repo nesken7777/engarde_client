@@ -9,6 +9,7 @@ use std::{
 
 use num_traits::ToBytes;
 use rurel::{
+    dqn::DQNAgentTrainer,
     mdp::{Agent, State},
     strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
     AgentTrainer,
@@ -55,8 +56,8 @@ struct MyState {
     cards: RestCards,
     p0_score: u32,
     p1_score: u32,
-    my_position: u8,
-    enemy_position: u8,
+    p0_position: u8,
+    p1_position: u8,
     game_end: bool,
 }
 
@@ -75,10 +76,24 @@ impl MyState {
         }
     }
 
+    fn my_position(&self) -> u8 {
+        match self.my_id {
+            PlayerID::Zero => self.p0_position,
+            PlayerID::One => self.p1_position,
+        }
+    }
+
+    fn enemy_position(&self) -> u8 {
+        match self.my_id {
+            PlayerID::Zero => self.p1_position,
+            PlayerID::One => self.p0_position,
+        }
+    }
+
     fn distance_from_center(&self) -> i8 {
         match self.my_id {
-            PlayerID::Zero => 12 - self.my_position as i8,
-            PlayerID::One => self.my_position as i8 - 12,
+            PlayerID::Zero => 12 - self.p0_position as i8,
+            PlayerID::One => self.p1_position as i8 - 12,
         }
     }
 }
@@ -141,8 +156,8 @@ impl State for MyState {
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.my_position.saturating_sub(card) >= 1,
-                            self.my_position + card < self.enemy_position,
+                            self.p0_position.saturating_sub(card) >= 1,
+                            self.p0_position + card < self.p1_position,
                             card,
                         )
                     })
@@ -152,7 +167,7 @@ impl State for MyState {
                     moves,
                     attack_cards(
                         &self.hands,
-                        self.enemy_position.checked_sub(self.my_position).unwrap(),
+                        self.p1_position.checked_sub(self.p0_position).unwrap(),
                     )
                     .into_iter()
                     .collect::<Vec<_>>(),
@@ -164,8 +179,8 @@ impl State for MyState {
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.my_position + card <= 23,
-                            self.my_position.saturating_sub(card) > self.enemy_position,
+                            self.p1_position + card <= 23,
+                            self.p1_position.saturating_sub(card) > self.p0_position,
                             card,
                         )
                     })
@@ -175,12 +190,78 @@ impl State for MyState {
                     moves,
                     attack_cards(
                         &self.hands,
-                        self.my_position.checked_sub(self.enemy_position).unwrap(),
+                        self.p1_position.checked_sub(self.p0_position).unwrap(),
                     )
                     .into_iter()
                     .collect::<Vec<_>>(),
                 ]
                 .concat()
+            }
+        }
+    }
+}
+// struct MyState {
+//     my_id: PlayerID,
+//     hands: Vec<u8>,
+//     cards: RestCards,
+//     p0_score: u32,
+//     p1_score: u32,
+//     my_position: u8,
+//     enemy_position: u8,
+//     game_end: bool,
+// }
+impl From<MyState> for [f32; 22] {
+    fn from(value: MyState) -> Self {
+        let id = vec![value.my_id.denote() as f32];
+        let mut hands = value
+            .hands
+            .into_iter()
+            .map(|x| x as f32)
+            .collect::<Vec<f32>>();
+        hands.resize(5, 0.0);
+        let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+        let p0_score = vec![value.p0_score as f32];
+        let p1_score = vec![value.p1_score as f32];
+        let my_position = vec![value.p0_position as f32];
+        let enemy_position = vec![value.p1_position as f32];
+        let game_end = vec![value.game_end as u8 as f32];
+        [
+            id,
+            hands,
+            cards,
+            p0_score,
+            p1_score,
+            my_position,
+            enemy_position,
+            game_end,
+        ]
+        .concat()
+        .try_into()
+        .unwrap()
+    }
+}
+
+impl From<Action> for [f32; 35] {
+    fn from(value: Action) -> Self {
+        let mut arr = [0f32; 35];
+        match value {
+            Action::Move(movement) => {
+                let Movement { card, direction } = movement;
+                match direction {
+                    Forward => {
+                        arr[card as usize] = 1.0;
+                        arr
+                    }
+                    Back => {
+                        arr[5 + card as usize] = 1.0;
+                        arr
+                    }
+                }
+            }
+            Action::Attack(attack) => {
+                let Attack { card, quantity } = attack;
+                arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
+                arr
             }
         }
     }
@@ -203,8 +284,8 @@ impl LearnedValues {
                     state.cards.to_vec(),
                     state.p0_score.to_le_bytes().to_vec(),
                     state.p1_score.to_le_bytes().to_vec(),
-                    vec![state.my_position],
-                    vec![state.enemy_position],
+                    vec![state.p0_position],
+                    vec![state.p1_position],
                     vec![state.game_end.into()],
                 ]
                 .concat();
@@ -238,21 +319,14 @@ impl LearnedValues {
         for _ in 0..map_len {
             //22がマジックナンバーすぎ
             let (state_bytes, next_map_) = next_map.split_at(22);
-            next_map = next_map_;
             // Stateを構築するぜ!
-            let (my_id_bytes, mut state_rest) = state_bytes.split_at(1);
-            let (hands_bytes, state_rest_) = state_rest.split_at(5);
-            state_rest = state_rest_;
-            let (cards_bytes, state_rest_) = state_rest.split_at(5);
-            state_rest = state_rest_;
-            let (p0_score_bytes, state_rest_) = state_rest.split_at(4);
-            state_rest = state_rest_;
-            let (p1_score_bytes, state_rest_) = state_rest.split_at(4);
-            state_rest = state_rest_;
-            let (my_position_bytes, state_rest_) = state_rest.split_at(1);
-            state_rest = state_rest_;
-            let (enemy_position_bytes, state_rest_) = state_rest.split_at(1);
-            state_rest = state_rest_;
+            let (my_id_bytes, state_rest) = state_bytes.split_at(1);
+            let (hands_bytes, state_rest) = state_rest.split_at(5);
+            let (cards_bytes, state_rest) = state_rest.split_at(5);
+            let (p0_score_bytes, state_rest) = state_rest.split_at(4);
+            let (p1_score_bytes, state_rest) = state_rest.split_at(4);
+            let (p0_position_bytes, state_rest) = state_rest.split_at(1);
+            let (p1_position_bytes, state_rest) = state_rest.split_at(1);
             let (game_end_bytes, _) = state_rest.split_at(1);
 
             let state = MyState {
@@ -265,8 +339,8 @@ impl LearnedValues {
                 cards: RestCards::from_slice(cards_bytes),
                 p0_score: u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
                 p1_score: u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
-                my_position: my_position_bytes[0],
-                enemy_position: enemy_position_bytes[0],
+                p0_position: p0_position_bytes[0],
+                p1_position: p1_position_bytes[0],
                 game_end: match game_end_bytes[0] {
                     0 => false,
                     1 => true,
@@ -274,18 +348,15 @@ impl LearnedValues {
                 },
             };
 
-            let (act_rwd_len_bytes, next_map_) = next_map.split_at(1);
-            next_map = next_map_;
+            let (act_rwd_len_bytes, next_map_) = next_map_.split_at(1);
             let act_rwd_len = act_rwd_len_bytes[0];
             let mut act_rwd_map: HashMap<Action, f64> = HashMap::new();
+            next_map = next_map_;
             for _ in 0..act_rwd_len {
                 let (action_bytes, next_map_) = next_map.split_at(1);
-                next_map = next_map_;
-                let (card_bytes, next_map_) = next_map.split_at(1);
-                next_map = next_map_;
-                let (property_bytes, next_map_) = next_map.split_at(1);
-                next_map = next_map_;
-                let (value_bytes, next_map_) = next_map.split_at(8);
+                let (card_bytes, next_map_) = next_map_.split_at(1);
+                let (property_bytes, next_map_) = next_map_.split_at(1);
+                let (value_bytes, next_map_) = next_map_.split_at(8);
                 next_map = next_map_;
                 let action = match action_bytes[0] {
                     0 => {
@@ -351,8 +422,8 @@ impl MyAgent {
                 cards: RestCards::new(),
                 p0_score: 0,
                 p1_score: 0,
-                my_position,
-                enemy_position,
+                p0_position: position_0,
+                p1_position: position_1,
                 game_end: false,
             },
         }
@@ -377,15 +448,8 @@ impl Agent<MyState> for MyAgent {
                 match Messages::parse(&read_stream(&mut self.reader)?) {
                     Ok(messages) => match messages {
                         BoardInfo(board_info) => {
-                            (self.state.my_position, self.state.enemy_position) =
-                                match self.state.my_id {
-                                    PlayerID::Zero => {
-                                        (board_info.player_position_0, board_info.player_position_1)
-                                    }
-                                    PlayerID::One => {
-                                        (board_info.player_position_1, board_info.player_position_0)
-                                    }
-                                };
+                            (self.state.p0_position, self.state.p1_position) =
+                                (board_info.player_position_0, board_info.player_position_1);
                         }
                         HandInfo(hand_info) => {
                             let mut hand_vec = hand_info.to_vec();
@@ -516,5 +580,10 @@ pub fn ai_main() -> io::Result<()> {
         .open(filename)?;
     file.write_all(&bytes)?;
 
+    Ok(())
+}
+
+pub fn dqn_main() -> io::Result<()> {
+    // let trainer = DQNAgentTrainer::new(0.99, 0.2);
     Ok(())
 }
