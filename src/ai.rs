@@ -1,17 +1,26 @@
 use std::{
     collections::{HashMap, HashSet},
     env::args,
-    fs::OpenOptions,
+    fs::{create_dir, OpenOptions},
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
+    path::Path,
 };
 
+use dfdx::{
+    nn::modules::{Linear, ReLU},
+    tensor::{Cpu, Tensor},
+};
 use num_traits::ToBytes;
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
+    strategy::{
+        explore::{ExplorationStrategy, RandomExploration},
+        learn::QLearning,
+        terminate::SinkStates,
+    },
     AgentTrainer,
 };
 use serde::{Deserialize, Serialize};
@@ -210,7 +219,7 @@ impl State for MyState {
 //     enemy_position: u8,
 //     game_end: bool,
 // }
-impl From<MyState> for [f32; 22] {
+impl From<MyState> for [f32; 16] {
     fn from(value: MyState) -> Self {
         let id = vec![value.my_id.denote() as f32];
         let mut hands = value
@@ -249,11 +258,11 @@ impl From<Action> for [f32; 35] {
                 let Movement { card, direction } = movement;
                 match direction {
                     Forward => {
-                        arr[card as usize] = 1.0;
+                        arr[card as usize - 1] = 1.0;
                         arr
                     }
                     Back => {
-                        arr[5 + card as usize] = 1.0;
+                        arr[5 + (card as usize - 1)] = 1.0;
                         arr
                     }
                 }
@@ -263,6 +272,33 @@ impl From<Action> for [f32; 35] {
                 arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
                 arr
             }
+        }
+    }
+}
+
+impl From<[f32; 35]> for Action {
+    fn from(value: [f32; 35]) -> Self {
+        match value
+            .into_iter()
+            .position(|x| x == 1.0)
+            .expect("どれかは1.0であるはず")
+        {
+            x @ 0..=4 => Action::Move(Movement {
+                card: (x + 1) as u8,
+                direction: Forward,
+            }),
+            x @ 5..=9 => Action::Move(Movement {
+                card: (x - 5 + 1) as u8,
+                direction: Back,
+            }),
+            x @ 10..=34 => {
+                let x = x - 10;
+                Action::Attack(Attack {
+                    card: (x / 5 + 1) as u8,
+                    quantity: (x % 5 + 1) as u8,
+                })
+            }
+            _ => unreachable!(),
         }
     }
 }
@@ -584,6 +620,66 @@ pub fn ai_main() -> io::Result<()> {
 }
 
 pub fn dqn_main() -> io::Result<()> {
-    // let trainer = DQNAgentTrainer::new(0.99, 0.2);
+    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
+    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
+    let past_exp = {};
+    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
+    for _ in 0..loop_kaisuu {
+        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+        let stream = loop {
+            if let Ok(stream) = TcpStream::connect(addr) {
+                break stream;
+            }
+        };
+        let (mut bufreader, mut bufwriter) =
+            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+        let id = get_id(&mut bufreader)?;
+        let player_name = PlayerName::new("dqnai".to_string());
+        send_info(&mut bufwriter, &player_name)?;
+        let _ = read_stream(&mut bufreader)?;
+        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+        let mut board_info_init = BoardInfo::new();
+
+        let hand_info = loop {
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(Messages::BoardInfo(board_info)) => {
+                    board_info_init = board_info;
+                }
+                Ok(Messages::HandInfo(hand_info)) => {
+                    break hand_info;
+                }
+                Ok(_) | Err(_) => {}
+            }
+        };
+        let mut hand_vec = hand_info.to_vec();
+        hand_vec.sort();
+        // AI用エージェント作成
+        let mut agent = MyAgent::new(
+            id,
+            hand_vec,
+            board_info_init.player_position_0,
+            board_info_init.player_position_1,
+            bufreader,
+            bufwriter,
+        );
+        trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
+    }
+    let learned_values = trainer.export_learned_values();
+    let linear0 = learned_values.0 .0;
+    let weight0 = linear0.weight;
+    let bias0 = linear0.bias;
+    let linear1 = learned_values.1 .0;
+    let weight1 = linear1.weight;
+    let bias1 = linear1.bias;
+    let linear2 = learned_values.2;
+    let weight2 = linear2.weight;
+    let bias2 = linear2.bias;
+    let _ = create_dir("learned_dqn");
+    weight0.save_to_npy("learned_dqn/weight0.npy")?;
+    bias0.save_to_npy("learned_dqn/bias0.npy")?;
+    weight1.save_to_npy("learned_dqn/weight1.npy")?;
+    bias1.save_to_npy("learned_dqn/bias1.npy")?;
+    weight2.save_to_npy("learned_dqn/weight2.npy")?;
+    bias2.save_to_npy("learned_dqn/bias2.npy")?;
     Ok(())
 }

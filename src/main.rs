@@ -2,7 +2,7 @@ mod ai;
 mod algorithm;
 mod errors;
 mod protocol;
-use ai::ai_main;
+use ai::{ai_main, dqn_main};
 use algorithm::RestCards;
 use protocol::{
     Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
@@ -232,6 +232,8 @@ fn interact_main() -> io::Result<()> {
 fn main() -> io::Result<()> {
     if cfg!(feature = "ai") {
         ai_main()
+    } else if cfg!(feature = "ai_dqn") {
+        dqn_main()
     } else {
         interact_main()
     }
