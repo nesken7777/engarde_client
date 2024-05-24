@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::algorithm::{used_card, ProbabilityTable, RestCards};
 use crate::protocol::{Action, Attack, Direction, Movement, Played};
+use core::panic;
 use std::ops::{Deref, Index, IndexMut};
+use std::vec;
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
@@ -89,6 +91,7 @@ pub fn more_than_three(hands: &[u8; 5]) -> Vec<bool> {
 pub fn calc_ave(hands: &[u8; 5]) -> Ratio<u8> {
     Ratio::from_integer((0..5).map(|i| hands[i]).sum()) / Ratio::from_integer(5)
 }
+//最初の動きを定義する。距離が12以下の時は別のメゾットに任せる。返り値は使うべきカード
 pub fn initial_move(
     hands: &[u8; 5],
     distance: u8,
@@ -123,9 +126,69 @@ pub fn initial_move(
             direction: Direction::Forward,
         }));
     }
-
+}
+//自分の手札で到達し得る相手との距離のvecを返す。
+pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
+    let mut vec1 = hands
+        .into_iter()
+        .map(|i| {
+            if distance as i8 - *i as i8 > 0 {
+                distance as i8 - *i as i8
+            } else {
+                todo!()
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut vec2 = hands
+        .into_iter()
+        .map(|i| distance as i8 + *i as i8)
+        .collect::<Vec<_>>();
+    let vec = [vec1, vec2].concat();
+    vec
+}
+//nが指定する距離に行くために行うActionを返す
+pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
+    //値を比較する関数
+    fn compare_numbers(num1: i32, num2: i32) -> i8 {
+        match num1.cmp(&num2) {
+            std::cmp::Ordering::Greater => 1,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Less => -1,
+        }
+    }
+    //行くべき方向を判定する関数
+    fn check_direction(n: i32, distance: i32) -> Option<Direction> {
+        match compare_numbers(n as i32, distance as i32) {
+            1 => Some(Direction::Back),
+            -1 => Some(Direction::Forward),
+            0 => None,
+        }
+    }
+    let direct = check_direction(n as i32, distance as i32)?;
+    match compare_numbers(n as i32, distance as i32) {
+        1 => Some(Action::Move(Movement {
+            card: n - distance,
+            direction: direct,
+        })),
+        -1 => Some(Action::Move(Movement {
+            card: distance - n,
+            direction: direct,
+        })),
+        _ => None,
+    }
 }
 
-pub fn normal_move() {
+pub fn normal_move(hands: &[u8; 5], distance: u8, acceptable: AcceptableNumbers) {
+    let togo7 = action_togo(7, distance);
+    let togo2 = action_togo(2, distance);
+    let movement_togo7=match togo7{
+        Some(act)=>act.get_movement(),
+        None=>None
+    };
+    match movement_togo7{
+        Some(movement)=>{if hands[movement.card as usize]!=0{
+
+        }}
+    }
 
 }

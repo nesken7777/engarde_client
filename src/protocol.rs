@@ -252,7 +252,14 @@ pub enum Action {
     Move(Movement),
     Attack(Attack),
 }
-
+impl Action{
+    pub fn get_movement(self)->Option<Movement>{
+        match self{
+            Action::Move(movement)=>Some(movement),
+            Action::Attack(_)=>None
+        }
+    }
+}
 #[derive(Deserialize, Debug)]
 pub struct PlayedMoveMent {
     #[serde(rename = "Type")]
