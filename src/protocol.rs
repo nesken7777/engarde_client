@@ -253,6 +253,15 @@ pub enum Action {
     Attack(Attack),
 }
 
+impl Action{
+    pub fn get_movement(self)->Option<Movement>{
+        match self{
+            Action::Move(movement)=>Some(movement),
+            Action::Attack(_)=>None
+        }
+    }
+}
+
 impl From<Action> for [f32; 35] {
     fn from(value: Action) -> Self {
         let mut arr = [0f32; 35];

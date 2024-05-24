@@ -1,3 +1,4 @@
+mod algorithm2;
 mod algorithm;
 mod errors;
 mod protocol;
