@@ -253,6 +253,61 @@ pub enum Action {
     Attack(Attack),
 }
 
+impl From<Action> for [f32; 35] {
+    fn from(value: Action) -> Self {
+        let mut arr = [0f32; 35];
+        match value {
+            Action::Move(movement) => {
+                let Movement { card, direction } = movement;
+                match direction {
+                    Direction::Forward => {
+                        arr[card as usize - 1] = 1.0;
+                        arr
+                    }
+                    Direction::Back => {
+                        arr[5 + (card as usize - 1)] = 1.0;
+                        arr
+                    }
+                }
+            }
+            Action::Attack(attack) => {
+                let Attack { card, quantity } = attack;
+                arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
+                arr
+            }
+        }
+    }
+}
+
+impl From<[f32; 35]> for Action {
+    fn from(value: [f32; 35]) -> Self {
+        match value
+            .into_iter()
+            .enumerate()
+            .max_by(|&(_, x),&(_,y)| x.partial_cmp(&y).unwrap())
+            .map(|(i, _)| i)
+            .unwrap()
+        {
+            x @ 0..=4 => Action::Move(Movement {
+                card: (x + 1) as u8,
+                direction: Direction::Forward,
+            }),
+            x @ 5..=9 => Action::Move(Movement {
+                card: (x - 5 + 1) as u8,
+                direction: Direction::Back,
+            }),
+            x @ 10..=34 => {
+                let x = x - 10;
+                Action::Attack(Attack {
+                    card: (x / 5 + 1) as u8,
+                    quantity: (x % 5 + 1) as u8,
+                })
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct PlayedMoveMent {
     #[serde(rename = "Type")]
@@ -567,22 +622,6 @@ impl PlayAttack {
             message_id: "102",
             play_card: info.card.to_string(),
             num_of_card: info.quantity.to_string(),
-        }
-    }
-}
-
-pub struct PlayerProperty {
-    pub id: PlayerID,
-    pub hand: Vec<u8>,
-    pub position: u8,
-}
-
-impl PlayerProperty {
-    pub fn new(id: PlayerID) -> Self {
-        Self {
-            id,
-            hand: Vec::new(),
-            position: 0,
         }
     }
 }

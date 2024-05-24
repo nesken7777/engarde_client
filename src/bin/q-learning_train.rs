@@ -1,33 +1,20 @@
 use std::{
-    cmp::Ordering,
     collections::{HashMap, HashSet},
     env::args,
-    fs::{create_dir, create_dir_all, OpenOptions},
+    fs::OpenOptions,
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
-    path::Path,
 };
 
-use dfdx::{
-    nn::modules::{Linear, ReLU},
-    shapes::Const,
-    tensor::{Cpu, NoneTape, Tensor, TensorFrom, ZerosTensor},
-};
-use num_traits::ToBytes;
 use rurel::{
-    dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{
-        explore::{ExplorationStrategy, RandomExploration},
-        learn::QLearning,
-        terminate::SinkStates,
-    },
+    strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
     AgentTrainer,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use engarde_client::{
     algorithm::{self, RestCards},
     get_id, print,
     protocol::{
@@ -37,48 +24,6 @@ use crate::{
     },
     read_stream, send_info,
 };
-
-struct BestExploration(AgentTrainer<MyState>);
-
-impl BestExploration {
-    pub fn new(trainer: AgentTrainer<MyState>) -> BestExploration {
-        BestExploration(trainer)
-    }
-}
-
-impl ExplorationStrategy<MyState> for BestExploration {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        match self.0.best_action(agent.current_state()) {
-            None => agent.pick_random_action(),
-            Some(action) => {
-                println!("AIが決めた");
-                agent.take_action(&action);
-                action
-            }
-        }
-    }
-}
-
-struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
-
-impl BestExplorationDqn {
-    pub fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
-        BestExplorationDqn(trainer)
-    }
-}
-
-impl ExplorationStrategy<MyState> for BestExplorationDqn {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        match self.0.best_action(agent.current_state()) {
-            None => agent.pick_random_action(),
-            Some(action) => {
-                println!("AIが決めた");
-                agent.take_action(&action);
-                action
-            }
-        }
-    }
-}
 
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
@@ -232,101 +177,6 @@ impl State for MyState {
         }
     }
 }
-// struct MyState {
-//     my_id: PlayerID,
-//     hands: Vec<u8>,
-//     cards: RestCards,
-//     p0_score: u32,
-//     p1_score: u32,
-//     my_position: u8,
-//     enemy_position: u8,
-//     game_end: bool,
-// }
-impl From<MyState> for [f32; 16] {
-    fn from(value: MyState) -> Self {
-        let id = vec![value.my_id.denote() as f32];
-        let mut hands = value
-            .hands
-            .into_iter()
-            .map(|x| x as f32)
-            .collect::<Vec<f32>>();
-        hands.resize(5, 0.0);
-        let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
-        let p0_score = vec![value.p0_score as f32];
-        let p1_score = vec![value.p1_score as f32];
-        let my_position = vec![value.p0_position as f32];
-        let enemy_position = vec![value.p1_position as f32];
-        let game_end = vec![value.game_end as u8 as f32];
-        [
-            id,
-            hands,
-            cards,
-            p0_score,
-            p1_score,
-            my_position,
-            enemy_position,
-            game_end,
-        ]
-        .concat()
-        .try_into()
-        .unwrap()
-    }
-}
-
-impl From<Action> for [f32; 35] {
-    fn from(value: Action) -> Self {
-        let mut arr = [0f32; 35];
-        match value {
-            Action::Move(movement) => {
-                let Movement { card, direction } = movement;
-                match direction {
-                    Forward => {
-                        arr[card as usize - 1] = 1.0;
-                        arr
-                    }
-                    Back => {
-                        arr[5 + (card as usize - 1)] = 1.0;
-                        arr
-                    }
-                }
-            }
-            Action::Attack(attack) => {
-                let Attack { card, quantity } = attack;
-                arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
-                arr
-            }
-        }
-    }
-}
-
-impl From<[f32; 35]> for Action {
-    fn from(value: [f32; 35]) -> Self {
-        match value
-            .into_iter()
-            .enumerate()
-            .max_by(|&(_, x),&(_,y)| x.partial_cmp(&y).unwrap())
-            .map(|(i, _)| i)
-            .unwrap()
-        {
-            x @ 0..=4 => Action::Move(Movement {
-                card: (x + 1) as u8,
-                direction: Forward,
-            }),
-            x @ 5..=9 => Action::Move(Movement {
-                card: (x - 5 + 1) as u8,
-                direction: Back,
-            }),
-            x @ 10..=34 => {
-                let x = x - 10;
-                Action::Attack(Attack {
-                    card: (x / 5 + 1) as u8,
-                    quantity: (x % 5 + 1) as u8,
-                })
-            }
-            _ => unreachable!(),
-        }
-    }
-}
 
 struct LearnedValues(HashMap<MyState, HashMap<Action, f64>>);
 
@@ -445,11 +295,11 @@ impl LearnedValues {
         LearnedValues(state_map)
     }
 
-    pub fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
+     fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
         self.0
     }
 
-    pub fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
+     fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
         LearnedValues(map)
     }
 }
@@ -470,10 +320,6 @@ impl MyAgent {
         reader: BufReader<TcpStream>,
         writer: BufWriter<TcpStream>,
     ) -> Self {
-        let (my_position, enemy_position) = match id {
-            PlayerID::Zero => (position_0, position_1),
-            PlayerID::One => (position_1, position_0),
-        };
         MyAgent {
             reader,
             writer,
@@ -561,11 +407,12 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
-pub fn ai_main() -> io::Result<()> {
+ fn main() -> io::Result<()> {
     let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     // ファイル読み込み
     let path = format!("learned{}", id);
-    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
+    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
+    {
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
         LearnedValues::deserialize(&data).get()
@@ -627,12 +474,11 @@ pub fn ai_main() -> io::Result<()> {
             &mut agent,
             &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
-            &BestExploration::new(trainer2),
+            &RandomExploration,
         );
         learned_values = trainer.export_learned_values();
     }
-    let learned_values = LearnedValues::from_map(learned_values);
-    let bytes = learned_values.serialize();
+    let bytes = LearnedValues::from_map(learned_values).serialize();
     let filename = format!("learned{}", id);
     let mut file = OpenOptions::new()
         .write(true)
@@ -640,130 +486,5 @@ pub fn ai_main() -> io::Result<()> {
         .create(true)
         .open(filename)?;
     file.write_all(&bytes)?;
-
-    Ok(())
-}
-
-fn files_name(id: u8) -> (String, String, String, String, String, String) {
-    (
-        format!("learned_dqn/{}/weight0.npy", id),
-        format!("learned_dqn/{}/bias0.npy", id),
-        format!("learned_dqn/{}/weight1.npy", id),
-        format!("learned_dqn/{}/bias1.npy", id),
-        format!("learned_dqn/{}/weight2.npy", id),
-        format!("learned_dqn/{}/bias2.npy", id),
-    )
-}
-
-pub fn dqn_main() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
-    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
-    for _ in 0..loop_kaisuu {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
-        let stream = loop {
-            if let Ok(stream) = TcpStream::connect(addr) {
-                break stream;
-            }
-        };
-        let (mut bufreader, mut bufwriter) =
-            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-        let id = get_id(&mut bufreader)?;
-        let player_name = PlayerName::new("dqnai".to_string());
-        send_info(&mut bufwriter, &player_name)?;
-        let _ = read_stream(&mut bufreader)?;
-        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-        let mut board_info_init = BoardInfo::new();
-
-        let hand_info = loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(Messages::BoardInfo(board_info)) => {
-                    board_info_init = board_info;
-                }
-                Ok(Messages::HandInfo(hand_info)) => {
-                    break hand_info;
-                }
-                Ok(_) | Err(_) => {}
-            }
-        };
-        let mut hand_vec = hand_info.to_vec();
-        hand_vec.sort();
-        // AI用エージェント作成
-        let mut agent = MyAgent::new(
-            id,
-            hand_vec,
-            board_info_init.player_position_0,
-            board_info_init.player_position_1,
-            bufreader,
-            bufwriter,
-        );
-        let past_exp = {
-            let cpu = Cpu::default();
-            let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
-            let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-            let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
-            let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-            let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
-            let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
-            let files = files_name(id.denote());
-            (|| {
-                weight0.load_from_npy(files.0).ok()?;
-                bias0.load_from_npy(files.1).ok()?;
-                weight1.load_from_npy(files.2).ok()?;
-                bias1.load_from_npy(files.3).ok()?;
-                weight2.load_from_npy(files.4).ok()?;
-                bias2.load_from_npy(files.5).ok()?;
-                Some(())
-            })()
-            .map_or(trainer.export_learned_values(), |_| {
-                (
-                    (
-                        Linear {
-                            weight: weight0,
-                            bias: bias0,
-                        },
-                        ReLU,
-                    ),
-                    (
-                        Linear {
-                            weight: weight1,
-                            bias: bias1,
-                        },
-                        ReLU,
-                    ),
-                    Linear {
-                        weight: weight2,
-                        bias: bias2,
-                    },
-                )
-            })
-        };
-        let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
-        trainer2.import_model(past_exp);
-        trainer.train(
-            &mut agent,
-            &mut SinkStates {},
-            &BestExplorationDqn::new(trainer2),
-        );
-        {
-            let learned_values = trainer.export_learned_values();
-            let linear0 = learned_values.0 .0;
-            let weight0 = linear0.weight;
-            let bias0 = linear0.bias;
-            let linear1 = learned_values.1 .0;
-            let weight1 = linear1.weight;
-            let bias1 = linear1.bias;
-            let linear2 = learned_values.2;
-            let weight2 = linear2.weight;
-            let bias2 = linear2.bias;
-            let files = files_name(id.denote());
-            let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
-            weight0.save_to_npy(files.0)?;
-            bias0.save_to_npy(files.1)?;
-            weight1.save_to_npy(files.2)?;
-            bias1.save_to_npy(files.3)?;
-            weight2.save_to_npy(files.4)?;
-            bias2.save_to_npy(files.5)?;
-        }
-    }
     Ok(())
 }

@@ -20,6 +20,15 @@ serde_with = { version = "3.7.0", default-features = false, features = [
 [patch.crates-io]
 rurel = { path = "rurel" }
 
-[features]
-ai = []
-ai_dqn = []
+[[bin]]
+name = "q-learning_train"
+
+[[bin]]
+name = "q-learning_eval"
+
+[[bin]]
+name = "dqn_train"
+
+[[bin]]
+name = "dqn_eval"
+

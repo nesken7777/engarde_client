@@ -1,55 +1,22 @@
-mod ai;
 mod algorithm;
 mod errors;
 mod protocol;
-use ai::{ai_main, dqn_main};
 use algorithm::RestCards;
+use engarde_client::{get_id, print, protocol::PlayerID, read_stream, send_info};
 use protocol::{
-    Action, Attack, BoardInfo, ConnectionStart, Direction, Evaluation, Messages, Movement,
-    PlayAttack, PlayMovement, PlayerID, PlayerName, PlayerProperty,
+    Action, Attack, BoardInfo, Direction, Evaluation, Messages, Movement, PlayAttack, PlayMovement,
+    PlayerName,
 };
-use serde::Serialize;
 use std::{
-    io::{self, BufRead, BufReader, BufWriter, Write},
+    io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
 };
-
-fn print(string: &str) -> io::Result<()> {
-    let mut stdout = std::io::stdout();
-    stdout.write_all(string.as_bytes())?;
-    stdout.write_all(b"\r\n")?;
-    stdout.flush()
-}
 
 fn read_keyboard() -> io::Result<String> {
     let mut word = String::new();
     std::io::stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
     Ok(response)
-}
-
-fn read_stream(bufreader: &mut BufReader<TcpStream>) -> io::Result<String> {
-    let mut string = String::new();
-    bufreader.read_line(&mut string)?;
-    Ok(string.trim().to_string())
-}
-
-fn get_id(bufreader: &mut BufReader<TcpStream>) -> io::Result<PlayerID> {
-    let string = read_stream(bufreader)?;
-    let connection_start = serde_json::from_str::<ConnectionStart>(&string)
-        .expect("来たものがConnectionStartじゃない");
-    Ok(connection_start.client_id)
-}
-
-fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> io::Result<()>
-where
-    W: Write,
-    T: Serialize,
-{
-    let string = format!("{}\r\n", serde_json::to_string(info).unwrap());
-    writer.write_all(string.as_bytes())?;
-    writer.flush()?;
-    Ok(())
 }
 
 fn ask_card(player: &PlayerProperty) -> io::Result<u8> {
@@ -172,7 +139,23 @@ fn act(
     Ok(())
 }
 
-fn interact_main() -> io::Result<()> {
+struct PlayerProperty {
+    pub id: PlayerID,
+    pub hand: Vec<u8>,
+    pub position: u8,
+}
+
+impl PlayerProperty {
+    pub fn new(id: PlayerID) -> Self {
+        Self {
+            id,
+            hand: Vec::new(),
+            position: 0,
+        }
+    }
+}
+
+fn main() -> io::Result<()> {
     // IPアドレスはいつか標準入力になると思います。
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     print("connect?")?;
@@ -227,14 +210,4 @@ fn interact_main() -> io::Result<()> {
         }
     }
     Ok(())
-}
-
-fn main() -> io::Result<()> {
-    if cfg!(feature = "ai") {
-        ai_main()
-    } else if cfg!(feature = "ai_dqn") {
-        dqn_main()
-    } else {
-        interact_main()
-    }
 }
