@@ -7,16 +7,14 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
-use num_traits::ToBytes;
 use rurel::{
-    dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
+    strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
     AgentTrainer,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use engarde_client::{
     algorithm::{self, RestCards},
     get_id, print,
     protocol::{
@@ -26,27 +24,6 @@ use crate::{
     },
     read_stream, send_info,
 };
-
-struct BestExploration(AgentTrainer<MyState>);
-
-impl BestExploration {
-    pub fn new(trainer: AgentTrainer<MyState>) -> BestExploration {
-        BestExploration(trainer)
-    }
-}
-
-impl ExplorationStrategy<MyState> for BestExploration {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        match self.0.best_action(agent.current_state()) {
-            None => agent.pick_random_action(),
-            Some(action) => {
-                println!("AIが決めた");
-                agent.take_action(&action);
-                action
-            }
-        }
-    }
-}
 
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
@@ -200,72 +177,6 @@ impl State for MyState {
         }
     }
 }
-// struct MyState {
-//     my_id: PlayerID,
-//     hands: Vec<u8>,
-//     cards: RestCards,
-//     p0_score: u32,
-//     p1_score: u32,
-//     my_position: u8,
-//     enemy_position: u8,
-//     game_end: bool,
-// }
-impl From<MyState> for [f32; 22] {
-    fn from(value: MyState) -> Self {
-        let id = vec![value.my_id.denote() as f32];
-        let mut hands = value
-            .hands
-            .into_iter()
-            .map(|x| x as f32)
-            .collect::<Vec<f32>>();
-        hands.resize(5, 0.0);
-        let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
-        let p0_score = vec![value.p0_score as f32];
-        let p1_score = vec![value.p1_score as f32];
-        let my_position = vec![value.p0_position as f32];
-        let enemy_position = vec![value.p1_position as f32];
-        let game_end = vec![value.game_end as u8 as f32];
-        [
-            id,
-            hands,
-            cards,
-            p0_score,
-            p1_score,
-            my_position,
-            enemy_position,
-            game_end,
-        ]
-        .concat()
-        .try_into()
-        .unwrap()
-    }
-}
-
-impl From<Action> for [f32; 35] {
-    fn from(value: Action) -> Self {
-        let mut arr = [0f32; 35];
-        match value {
-            Action::Move(movement) => {
-                let Movement { card, direction } = movement;
-                match direction {
-                    Forward => {
-                        arr[card as usize] = 1.0;
-                        arr
-                    }
-                    Back => {
-                        arr[5 + card as usize] = 1.0;
-                        arr
-                    }
-                }
-            }
-            Action::Attack(attack) => {
-                let Attack { card, quantity } = attack;
-                arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
-                arr
-            }
-        }
-    }
-}
 
 struct LearnedValues(HashMap<MyState, HashMap<Action, f64>>);
 
@@ -384,11 +295,11 @@ impl LearnedValues {
         LearnedValues(state_map)
     }
 
-    pub fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
+     fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
         self.0
     }
 
-    pub fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
+     fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
         LearnedValues(map)
     }
 }
@@ -409,10 +320,6 @@ impl MyAgent {
         reader: BufReader<TcpStream>,
         writer: BufWriter<TcpStream>,
     ) -> Self {
-        let (my_position, enemy_position) = match id {
-            PlayerID::Zero => (position_0, position_1),
-            PlayerID::One => (position_1, position_0),
-        };
         MyAgent {
             reader,
             writer,
@@ -500,11 +407,12 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
-pub fn ai_main() -> io::Result<()> {
+ fn main() -> io::Result<()> {
     let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     // ファイル読み込み
     let path = format!("learned{}", id);
-    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
+    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
+    {
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
         LearnedValues::deserialize(&data).get()
@@ -566,12 +474,11 @@ pub fn ai_main() -> io::Result<()> {
             &mut agent,
             &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
-            &BestExploration::new(trainer2),
+            &RandomExploration,
         );
         learned_values = trainer.export_learned_values();
     }
-    let learned_values = LearnedValues::from_map(learned_values);
-    let bytes = learned_values.serialize();
+    let bytes = LearnedValues::from_map(learned_values).serialize();
     let filename = format!("learned{}", id);
     let mut file = OpenOptions::new()
         .write(true)
@@ -579,11 +486,5 @@ pub fn ai_main() -> io::Result<()> {
         .create(true)
         .open(filename)?;
     file.write_all(&bytes)?;
-
-    Ok(())
-}
-
-pub fn dqn_main() -> io::Result<()> {
-    // let trainer = DQNAgentTrainer::new(0.99, 0.2);
     Ok(())
 }
