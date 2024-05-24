@@ -1,7 +1,8 @@
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     env::args,
-    fs::{create_dir, OpenOptions},
+    fs::{create_dir, create_dir_all, OpenOptions},
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
@@ -10,7 +11,8 @@ use std::{
 
 use dfdx::{
     nn::modules::{Linear, ReLU},
-    tensor::{Cpu, Tensor},
+    shapes::Const,
+    tensor::{Cpu, NoneTape, Tensor, TensorFrom, ZerosTensor},
 };
 use num_traits::ToBytes;
 use rurel::{
@@ -45,6 +47,27 @@ impl BestExploration {
 }
 
 impl ExplorationStrategy<MyState> for BestExploration {
+    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        match self.0.best_action(agent.current_state()) {
+            None => agent.pick_random_action(),
+            Some(action) => {
+                println!("AIが決めた");
+                agent.take_action(&action);
+                action
+            }
+        }
+    }
+}
+
+struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
+
+impl BestExplorationDqn {
+    pub fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
+        BestExplorationDqn(trainer)
+    }
+}
+
+impl ExplorationStrategy<MyState> for BestExplorationDqn {
     fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
@@ -280,8 +303,10 @@ impl From<[f32; 35]> for Action {
     fn from(value: [f32; 35]) -> Self {
         match value
             .into_iter()
-            .position(|x| x == 1.0)
-            .expect("どれかは1.0であるはず")
+            .enumerate()
+            .max_by(|&(_, x),&(_,y)| x.partial_cmp(&y).unwrap())
+            .map(|(i, _)| i)
+            .unwrap()
         {
             x @ 0..=4 => Action::Move(Movement {
                 card: (x + 1) as u8,
@@ -619,10 +644,19 @@ pub fn ai_main() -> io::Result<()> {
     Ok(())
 }
 
+fn files_name(id: u8) -> (String, String, String, String, String, String) {
+    (
+        format!("learned_dqn/{}/weight0.npy", id),
+        format!("learned_dqn/{}/bias0.npy", id),
+        format!("learned_dqn/{}/weight1.npy", id),
+        format!("learned_dqn/{}/bias1.npy", id),
+        format!("learned_dqn/{}/weight2.npy", id),
+        format!("learned_dqn/{}/bias2.npy", id),
+    )
+}
+
 pub fn dqn_main() -> io::Result<()> {
-    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
-    let past_exp = {};
     let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
     for _ in 0..loop_kaisuu {
         let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
@@ -662,24 +696,74 @@ pub fn dqn_main() -> io::Result<()> {
             bufreader,
             bufwriter,
         );
-        trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
+        let past_exp = {
+            let cpu = Cpu::default();
+            let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
+            let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
+            let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
+            let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+            let files = files_name(id.denote());
+            (|| {
+                weight0.load_from_npy(files.0).ok()?;
+                bias0.load_from_npy(files.1).ok()?;
+                weight1.load_from_npy(files.2).ok()?;
+                bias1.load_from_npy(files.3).ok()?;
+                weight2.load_from_npy(files.4).ok()?;
+                bias2.load_from_npy(files.5).ok()?;
+                Some(())
+            })()
+            .map_or(trainer.export_learned_values(), |_| {
+                (
+                    (
+                        Linear {
+                            weight: weight0,
+                            bias: bias0,
+                        },
+                        ReLU,
+                    ),
+                    (
+                        Linear {
+                            weight: weight1,
+                            bias: bias1,
+                        },
+                        ReLU,
+                    ),
+                    Linear {
+                        weight: weight2,
+                        bias: bias2,
+                    },
+                )
+            })
+        };
+        let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+        trainer2.import_model(past_exp);
+        trainer.train(
+            &mut agent,
+            &mut SinkStates {},
+            &BestExplorationDqn::new(trainer2),
+        );
+        {
+            let learned_values = trainer.export_learned_values();
+            let linear0 = learned_values.0 .0;
+            let weight0 = linear0.weight;
+            let bias0 = linear0.bias;
+            let linear1 = learned_values.1 .0;
+            let weight1 = linear1.weight;
+            let bias1 = linear1.bias;
+            let linear2 = learned_values.2;
+            let weight2 = linear2.weight;
+            let bias2 = linear2.bias;
+            let files = files_name(id.denote());
+            let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
+            weight0.save_to_npy(files.0)?;
+            bias0.save_to_npy(files.1)?;
+            weight1.save_to_npy(files.2)?;
+            bias1.save_to_npy(files.3)?;
+            weight2.save_to_npy(files.4)?;
+            bias2.save_to_npy(files.5)?;
+        }
     }
-    let learned_values = trainer.export_learned_values();
-    let linear0 = learned_values.0 .0;
-    let weight0 = linear0.weight;
-    let bias0 = linear0.bias;
-    let linear1 = learned_values.1 .0;
-    let weight1 = linear1.weight;
-    let bias1 = linear1.bias;
-    let linear2 = learned_values.2;
-    let weight2 = linear2.weight;
-    let bias2 = linear2.bias;
-    let _ = create_dir("learned_dqn");
-    weight0.save_to_npy("learned_dqn/weight0.npy")?;
-    bias0.save_to_npy("learned_dqn/bias0.npy")?;
-    weight1.save_to_npy("learned_dqn/weight1.npy")?;
-    bias1.save_to_npy("learned_dqn/bias1.npy")?;
-    weight2.save_to_npy("learned_dqn/weight2.npy")?;
-    bias2.save_to_npy("learned_dqn/bias2.npy")?;
     Ok(())
 }
