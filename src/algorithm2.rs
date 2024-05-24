@@ -162,6 +162,7 @@ pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
             1 => Some(Direction::Back),
             -1 => Some(Direction::Forward),
             0 => None,
+            _=>unreachable!()
         }
     }
     let direct = check_direction(n as i32, distance as i32)?;
@@ -178,17 +179,20 @@ pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
     }
 }
 
-pub fn normal_move(hands: &[u8; 5], distance: u8, acceptable: AcceptableNumbers) {
+pub fn normal_move(hands: &[u8; 5], distance: u8, acceptable: AcceptableNumbers) -> Option<Action> {
     let togo7 = action_togo(7, distance);
     let togo2 = action_togo(2, distance);
-    let movement_togo7=match togo7{
-        Some(act)=>act.get_movement(),
-        None=>None
+    let movement_togo7 = match togo7 {
+        Some(act) => act.get_movement(),
+        None => None,
     };
-    match movement_togo7{
-        Some(movement)=>{if hands[movement.card as usize]!=0{
-
-        }}
+    match movement_togo7 {
+        Some(movement) => {
+            if hands[movement.card as usize] != 0 && movement.direction == Direction::Forward {
+                return togo7;
+            }
+            todo!();
+        }
+        None => todo!(),
     }
-
 }
