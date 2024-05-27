@@ -20,11 +20,11 @@ impl PlayerID {
             PlayerID::One => 1,
         }
     }
-    pub fn from_u8(id:u8)->Option<PlayerID>{
+    pub fn from_u8(id: u8) -> Option<PlayerID> {
         match id {
             0 => Some(PlayerID::Zero),
             1 => Some(PlayerID::One),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -253,11 +253,46 @@ pub enum Action {
     Attack(Attack),
 }
 
-impl Action{
-    pub fn get_movement(self)->Option<Movement>{
-        match self{
-            Action::Move(movement)=>Some(movement),
-            Action::Attack(_)=>None
+impl Action {
+    pub fn as_index(&self) -> usize {
+        match self {
+            Action::Move(movement) => {
+                let &Movement { card, direction } = movement;
+                match direction {
+                    Direction::Forward => card as usize - 1,
+                    Direction::Back => 5 + (card as usize - 1),
+                }
+            }
+            Action::Attack(attack) => {
+                let &Attack { card, quantity } = attack;
+                5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)
+            }
+        }
+    }
+    pub fn from_index(idx: usize) -> Action {
+        match idx {
+            x @ 0..=4 => Action::Move(Movement {
+                card: (x + 1) as u8,
+                direction: Direction::Forward,
+            }),
+            x @ 5..=9 => Action::Move(Movement {
+                card: (x - 5 + 1) as u8,
+                direction: Direction::Back,
+            }),
+            x @ 10..=34 => {
+                let x = x - 10;
+                Action::Attack(Attack {
+                    card: (x / 5 + 1) as u8,
+                    quantity: (x % 5 + 1) as u8,
+                })
+            }
+            _ => unreachable!(),
+        }
+    }
+    pub fn get_movement(self) -> Option<Movement> {
+        match self {
+            Action::Move(movement) => Some(movement),
+            Action::Attack(_) => None,
         }
     }
 }
@@ -265,26 +300,8 @@ impl Action{
 impl From<Action> for [f32; 35] {
     fn from(value: Action) -> Self {
         let mut arr = [0f32; 35];
-        match value {
-            Action::Move(movement) => {
-                let Movement { card, direction } = movement;
-                match direction {
-                    Direction::Forward => {
-                        arr[card as usize - 1] = 1.0;
-                        arr
-                    }
-                    Direction::Back => {
-                        arr[5 + (card as usize - 1)] = 1.0;
-                        arr
-                    }
-                }
-            }
-            Action::Attack(attack) => {
-                let Attack { card, quantity } = attack;
-                arr[5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)] = 1.0;
-                arr
-            }
-        }
+        arr[value.as_index()] = 1.0;
+        arr
     }
 }
 
@@ -293,7 +310,7 @@ impl From<[f32; 35]> for Action {
         match value
             .into_iter()
             .enumerate()
-            .max_by(|&(_, x),&(_,y)| x.partial_cmp(&y).unwrap())
+            .max_by(|&(_, x), &(_, y)| x.total_cmp(&y))
             .map(|(i, _)| i)
             .unwrap()
         {
