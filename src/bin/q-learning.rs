@@ -588,10 +588,11 @@ enum Mode {
 
 #[derive(Parser, Debug)]
 struct Arguments {
+    #[arg(long, short)]
     mode: Mode,
-    #[arg(default_value_t = 0)]
+    #[arg(long, short, default_value_t = 0)]
     id: u8,
-    #[arg(default_value_t = 1)]
+    #[arg(long, short, default_value_t = 1)]
     loop_count: usize,
 }
 fn main() -> io::Result<()> {

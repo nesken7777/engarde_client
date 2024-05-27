@@ -589,8 +589,9 @@ enum Mode {
 
 #[derive(Parser, Debug)]
 struct Arguments {
+    #[arg(long, short)]
     mode: Mode,
-    #[arg(default_value_t = 1)]
+    #[arg(long, short, default_value_t = 1)]
     loop_count: usize,
 }
 
