@@ -1,13 +1,12 @@
 use std::{
     collections::HashSet,
-    env::args,
     fs::create_dir_all,
     hash::RandomState,
     io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
 };
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use dfdx::{
     nn::modules::{Linear, ReLU},
     shapes::Const,
@@ -382,10 +381,9 @@ fn files_name(id: u8) -> (String, String, String, String, String, String) {
     )
 }
 
-fn dqn_train() -> io::Result<()> {
+fn dqn_train(loop_count: usize) -> io::Result<()> {
     let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
-    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
-    for _ in 0..loop_kaisuu {
+    for _ in 0..loop_count {
         let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
         let stream = loop {
             if let Ok(stream) = TcpStream::connect(addr) {
@@ -583,16 +581,23 @@ fn dqn_eval() -> io::Result<()> {
     Ok(())
 }
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Clone, ValueEnum)]
 enum Mode {
     Train,
     Eval,
 }
 
+#[derive(Parser, Debug)]
+struct Arguments {
+    mode: Mode,
+    #[arg(default_value_t = 1)]
+    loop_count: usize,
+}
+
 fn main() -> io::Result<()> {
-    let mode = Mode::parse();
-    match mode {
-        Mode::Train => dqn_train(),
+    let args = Arguments::parse();
+    match args.mode {
+        Mode::Train => dqn_train(args.loop_count),
         Mode::Eval => dqn_eval(),
     }
 }

@@ -1,13 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
-    env::args,
     fs::OpenOptions,
     hash::RandomState,
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
 };
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use rurel::{
     mdp::{Agent, State},
     strategy::{
@@ -433,8 +432,7 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
-fn q_train() -> io::Result<()> {
-    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
+fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
     // ファイル読み込み
     let path = format!("learned{}", id);
     let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
@@ -446,9 +444,7 @@ fn q_train() -> io::Result<()> {
         HashMap::new()
     };
 
-    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
-
-    for _ in 0..loop_kaisuu {
+    for _ in 0..loop_count {
         let mut trainer = AgentTrainer::new();
         trainer.import_state(learned_values.clone());
 
@@ -515,8 +511,7 @@ fn q_train() -> io::Result<()> {
     Ok(())
 }
 
-fn q_eval() -> io::Result<()> {
-    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
+fn q_eval(id: u8) -> io::Result<()> {
     // ファイル読み込み
     let path = format!("learned{}", id);
     let learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
@@ -585,16 +580,24 @@ fn q_eval() -> io::Result<()> {
     Ok(())
 }
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Clone, ValueEnum)]
 enum Mode {
     Train,
     Eval,
 }
 
+#[derive(Parser, Debug)]
+struct Arguments {
+    mode: Mode,
+    #[arg(default_value_t = 1)]
+    loop_count: usize,
+    #[arg(default_value_t = 0)]
+    id: u8,
+}
 fn main() -> io::Result<()> {
-    let mode = Mode::parse();
-    match mode {
-        Mode::Train => q_train(),
-        Mode::Eval => q_eval(),
+    let args = Arguments::parse();
+    match args.mode {
+        Mode::Train => q_train(args.loop_count, args.id),
+        Mode::Eval => q_eval(args.id),
     }
 }
