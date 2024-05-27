@@ -1,16 +1,25 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     env::args,
-    fs::OpenOptions,
+    fs::create_dir_all,
     hash::RandomState,
-    io::{self, BufReader, BufWriter, Read, Write},
+    io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
 };
 
+use clap::Parser;
+use dfdx::{
+    nn::modules::{Linear, ReLU},
+    shapes::Const,
+    tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
+};
 use rurel::{
+    dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::RandomExploration, learn::QLearning, terminate::SinkStates},
-    AgentTrainer,
+    strategy::{
+        explore::{ExplorationStrategy, RandomExploration},
+        terminate::SinkStates,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -18,12 +27,53 @@ use engarde_client::{
     algorithm::{self, RestCards},
     get_id, print,
     protocol::{
-        self, Action, Attack, BoardInfo,
+        self, Action, BoardInfo,
         Direction::{Back, Forward},
         Evaluation, Messages, Movement, PlayAttack, PlayMovement, PlayerID, PlayerName,
     },
     read_stream, send_info,
 };
+
+struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
+
+impl BestExplorationDqn {
+    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
+        BestExplorationDqn(trainer)
+    }
+}
+
+impl ExplorationStrategy<MyState> for BestExplorationDqn {
+    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        let current_state = agent.current_state();
+
+        // 行動していいアクション"のインデックス"のリストを取得
+        let available_action_indicies = current_state
+            .actions()
+            .into_iter()
+            .map(|action| action.as_index())
+            .collect::<Vec<usize>>();
+
+        // 評価値のリストを取得
+        let expected_values = self.0.expected_value(current_state);
+
+        // 有効なアクションと評価値のリストを取得
+        let available_actions = expected_values
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| available_action_indicies.contains(i))
+            .collect::<Vec<(usize, f32)>>();
+
+        // 評価値が最大のインデックスを取得
+        let action_index = available_actions
+            .into_iter()
+            .max_by(|(_, value), (_, other_value)| value.total_cmp(other_value))
+            .unwrap()
+            .0;
+
+        // そのインデックスでアクションに変換
+        Action::from_index(action_index)
+    }
+}
 
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
@@ -177,130 +227,44 @@ impl State for MyState {
         }
     }
 }
-
-struct LearnedValues(HashMap<MyState, HashMap<Action, f64>>);
-
-impl LearnedValues {
-    fn serialize(&self) -> Vec<u8> {
-        let map_len = self.0.len();
-        let state_map_bytes = self
-            .0
-            .iter()
-            .flat_map(|(state, action_reward)| -> Vec<u8> {
-                let mut hands = state.hands.clone();
-                hands.resize(5, 0);
-                let state_bytes = [
-                    vec![state.my_id.denote()],
-                    hands,
-                    state.cards.to_vec(),
-                    state.p0_score.to_le_bytes().to_vec(),
-                    state.p1_score.to_le_bytes().to_vec(),
-                    vec![state.p0_position],
-                    vec![state.p1_position],
-                    vec![state.game_end.into()],
-                ]
-                .concat();
-                let act_rwd_len = action_reward.len();
-                let action_reward_bytes = action_reward
-                    .iter()
-                    .flat_map(|(action, value)| -> Vec<u8> {
-                        match action {
-                            Action::Move(movement) => {
-                                let action_bytes =
-                                    vec![0, movement.card, movement.direction.denote()];
-                                [action_bytes, value.to_le_bytes().to_vec()].concat()
-                            }
-                            Action::Attack(attack) => {
-                                let action_bytes = vec![1, attack.card, attack.quantity];
-                                [action_bytes, value.to_le_bytes().to_vec()].concat()
-                            }
-                        }
-                    })
-                    .collect::<Vec<u8>>();
-                [state_bytes, vec![act_rwd_len as u8], action_reward_bytes].concat()
-            })
-            .collect::<Vec<u8>>();
-        [map_len.to_le_bytes().to_vec(), state_map_bytes].concat()
-    }
-    fn deserialize(bytes: &[u8]) -> LearnedValues {
-        let (map_len_bytes, state_map_bytes) = bytes.split_at(8);
-        let map_len = usize::from_le_bytes(map_len_bytes.try_into().unwrap());
-        let mut state_map: HashMap<MyState, HashMap<Action, f64>> = HashMap::new();
-        let mut next_map = state_map_bytes;
-        for _ in 0..map_len {
-            //22がマジックナンバーすぎ
-            let (state_bytes, next_map_) = next_map.split_at(22);
-            // Stateを構築するぜ!
-            let (my_id_bytes, state_rest) = state_bytes.split_at(1);
-            let (hands_bytes, state_rest) = state_rest.split_at(5);
-            let (cards_bytes, state_rest) = state_rest.split_at(5);
-            let (p0_score_bytes, state_rest) = state_rest.split_at(4);
-            let (p1_score_bytes, state_rest) = state_rest.split_at(4);
-            let (p0_position_bytes, state_rest) = state_rest.split_at(1);
-            let (p1_position_bytes, state_rest) = state_rest.split_at(1);
-            let (game_end_bytes, _) = state_rest.split_at(1);
-
-            let state = MyState {
-                my_id: PlayerID::from_u8(my_id_bytes[0]).unwrap(),
-                hands: hands_bytes
-                    .iter()
-                    .filter(|&&x| x != 0)
-                    .copied()
-                    .collect::<Vec<u8>>(),
-                cards: RestCards::from_slice(cards_bytes),
-                p0_score: u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
-                p1_score: u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
-                p0_position: p0_position_bytes[0],
-                p1_position: p1_position_bytes[0],
-                game_end: match game_end_bytes[0] {
-                    0 => false,
-                    1 => true,
-                    _ => panic!(),
-                },
-            };
-
-            let (act_rwd_len_bytes, next_map_) = next_map_.split_at(1);
-            let act_rwd_len = act_rwd_len_bytes[0];
-            let mut act_rwd_map: HashMap<Action, f64> = HashMap::new();
-            next_map = next_map_;
-            for _ in 0..act_rwd_len {
-                let (action_bytes, next_map_) = next_map.split_at(1);
-                let (card_bytes, next_map_) = next_map_.split_at(1);
-                let (property_bytes, next_map_) = next_map_.split_at(1);
-                let (value_bytes, next_map_) = next_map_.split_at(8);
-                next_map = next_map_;
-                let action = match action_bytes[0] {
-                    0 => {
-                        let direction = match property_bytes[0] {
-                            0 => Forward,
-                            1 => Back,
-                            _ => unreachable!(),
-                        };
-                        Action::Move(Movement {
-                            card: card_bytes[0],
-                            direction,
-                        })
-                    }
-                    1 => Action::Attack(Attack {
-                        card: card_bytes[0],
-                        quantity: property_bytes[0],
-                    }),
-                    _ => unreachable!(),
-                };
-                let value = f64::from_le_bytes(value_bytes.try_into().unwrap());
-                act_rwd_map.insert(action, value);
-            }
-            state_map.insert(state, act_rwd_map);
-        }
-        LearnedValues(state_map)
-    }
-
-     fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
-        self.0
-    }
-
-     fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
-        LearnedValues(map)
+// struct MyState {
+//     my_id: PlayerID,
+//     hands: Vec<u8>,
+//     cards: RestCards,
+//     p0_score: u32,
+//     p1_score: u32,
+//     my_position: u8,
+//     enemy_position: u8,
+//     game_end: bool,
+// }
+impl From<MyState> for [f32; 16] {
+    fn from(value: MyState) -> Self {
+        let id = vec![value.my_id.denote() as f32];
+        let mut hands = value
+            .hands
+            .into_iter()
+            .map(|x| x as f32)
+            .collect::<Vec<f32>>();
+        hands.resize(5, 0.0);
+        let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+        let p0_score = vec![value.p0_score as f32];
+        let p1_score = vec![value.p1_score as f32];
+        let my_position = vec![value.p0_position as f32];
+        let enemy_position = vec![value.p1_position as f32];
+        let game_end = vec![value.game_end as u8 as f32];
+        [
+            id,
+            hands,
+            cards,
+            p0_score,
+            p1_score,
+            my_position,
+            enemy_position,
+            game_end,
+        ]
+        .concat()
+        .try_into()
+        .unwrap()
     }
 }
 
@@ -407,29 +371,21 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
- fn main() -> io::Result<()> {
-    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
-    // ファイル読み込み
-    let path = format!("learned{}", id);
-    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
-    {
-        let mut data = Vec::new();
-        file.read_to_end(&mut data).unwrap();
-        LearnedValues::deserialize(&data).get()
-    } else {
-        HashMap::new()
-    };
+fn files_name(id: u8) -> (String, String, String, String, String, String) {
+    (
+        format!("learned_dqn/{}/weight0.npy", id),
+        format!("learned_dqn/{}/bias0.npy", id),
+        format!("learned_dqn/{}/weight1.npy", id),
+        format!("learned_dqn/{}/bias1.npy", id),
+        format!("learned_dqn/{}/weight2.npy", id),
+        format!("learned_dqn/{}/bias2.npy", id),
+    )
+}
 
+fn dqn_train() -> io::Result<()> {
+    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
     let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
-
     for _ in 0..loop_kaisuu {
-        let mut trainer = AgentTrainer::new();
-        trainer.import_state(learned_values.clone());
-
-        // 吐き出された学習内容を取り込む
-        let mut trainer2 = AgentTrainer::new();
-        trainer2.import_state(learned_values);
-
         let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
         let stream = loop {
             if let Ok(stream) = TcpStream::connect(addr) {
@@ -439,10 +395,9 @@ impl Agent<MyState> for MyAgent {
         let (mut bufreader, mut bufwriter) =
             (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
         let id = get_id(&mut bufreader)?;
-        let player_name = PlayerName::new("qai".to_string());
+        let player_name = PlayerName::new("dqnai".to_string());
         send_info(&mut bufwriter, &player_name)?;
         let _ = read_stream(&mut bufreader)?;
-
         // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
         let mut board_info_init = BoardInfo::new();
 
@@ -468,23 +423,196 @@ impl Agent<MyState> for MyAgent {
             bufreader,
             bufwriter,
         );
+        let past_exp = {
+            let cpu = Cpu::default();
+            let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
+            let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
+            let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
+            let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+            let files = files_name(id.denote());
+            (|| {
+                weight0.load_from_npy(files.0).ok()?;
+                bias0.load_from_npy(files.1).ok()?;
+                weight1.load_from_npy(files.2).ok()?;
+                bias1.load_from_npy(files.3).ok()?;
+                weight2.load_from_npy(files.4).ok()?;
+                bias2.load_from_npy(files.5).ok()?;
+                Some(())
+            })()
+            .map_or(trainer.export_learned_values(), |_| {
+                (
+                    (
+                        Linear {
+                            weight: weight0,
+                            bias: bias0,
+                        },
+                        ReLU,
+                    ),
+                    (
+                        Linear {
+                            weight: weight1,
+                            bias: bias1,
+                        },
+                        ReLU,
+                    ),
+                    Linear {
+                        weight: weight2,
+                        bias: bias2,
+                    },
+                )
+            })
+        };
+        trainer.import_model(past_exp);
+        trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
+        {
+            let learned_values = trainer.export_learned_values();
+            let linear0 = learned_values.0 .0;
+            let weight0 = linear0.weight;
+            let bias0 = linear0.bias;
+            let linear1 = learned_values.1 .0;
+            let weight1 = linear1.weight;
+            let bias1 = linear1.bias;
+            let linear2 = learned_values.2;
+            let weight2 = linear2.weight;
+            let bias2 = linear2.bias;
+            let files = files_name(id.denote());
+            let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
+            weight0.save_to_npy(files.0)?;
+            bias0.save_to_npy(files.1)?;
+            weight1.save_to_npy(files.2)?;
+            bias1.save_to_npy(files.3)?;
+            weight2.save_to_npy(files.4)?;
+            bias2.save_to_npy(files.5)?;
+        }
+    }
+    Ok(())
+}
 
-        //トレーニング開始
+fn dqn_eval() -> io::Result<()> {
+    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
+    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
+    for _ in 0..loop_kaisuu {
+        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+        let stream = loop {
+            if let Ok(stream) = TcpStream::connect(addr) {
+                break stream;
+            }
+        };
+        let (mut bufreader, mut bufwriter) =
+            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+        let id = get_id(&mut bufreader)?;
+        let player_name = PlayerName::new("dqnai".to_string());
+        send_info(&mut bufwriter, &player_name)?;
+        let _ = read_stream(&mut bufreader)?;
+        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+        let mut board_info_init = BoardInfo::new();
+
+        let hand_info = loop {
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(Messages::BoardInfo(board_info)) => {
+                    board_info_init = board_info;
+                }
+                Ok(Messages::HandInfo(hand_info)) => {
+                    break hand_info;
+                }
+                Ok(_) | Err(_) => {}
+            }
+        };
+        let mut hand_vec = hand_info.to_vec();
+        hand_vec.sort();
+        // AI用エージェント作成
+        let mut agent = MyAgent::new(
+            id,
+            hand_vec,
+            board_info_init.player_position_0,
+            board_info_init.player_position_1,
+            bufreader,
+            bufwriter,
+        );
+        let past_exp = {
+            let cpu = Cpu::default();
+            let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
+            let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
+            let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+            let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
+            let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+            let files = files_name(id.denote());
+            (|| {
+                weight0.load_from_npy(files.0).ok()?;
+                bias0.load_from_npy(files.1).ok()?;
+                weight1.load_from_npy(files.2).ok()?;
+                bias1.load_from_npy(files.3).ok()?;
+                weight2.load_from_npy(files.4).ok()?;
+                bias2.load_from_npy(files.5).ok()?;
+                Some(())
+            })()
+            .map_or(trainer.export_learned_values(), |_| {
+                (
+                    (
+                        Linear {
+                            weight: weight0,
+                            bias: bias0,
+                        },
+                        ReLU,
+                    ),
+                    (
+                        Linear {
+                            weight: weight1,
+                            bias: bias1,
+                        },
+                        ReLU,
+                    ),
+                    Linear {
+                        weight: weight2,
+                        bias: bias2,
+                    },
+                )
+            })
+        };
+        let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+        trainer2.import_model(past_exp);
         trainer.train(
             &mut agent,
-            &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
-            &RandomExploration,
+            &BestExplorationDqn::new(trainer2),
         );
-        learned_values = trainer.export_learned_values();
+        {
+            let learned_values = trainer.export_learned_values();
+            let linear0 = learned_values.0 .0;
+            let weight0 = linear0.weight;
+            let bias0 = linear0.bias;
+            let linear1 = learned_values.1 .0;
+            let weight1 = linear1.weight;
+            let bias1 = linear1.bias;
+            let linear2 = learned_values.2;
+            let weight2 = linear2.weight;
+            let bias2 = linear2.bias;
+            let files = files_name(id.denote());
+            let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
+            weight0.save_to_npy(files.0)?;
+            bias0.save_to_npy(files.1)?;
+            weight1.save_to_npy(files.2)?;
+            bias1.save_to_npy(files.3)?;
+            weight2.save_to_npy(files.4)?;
+            bias2.save_to_npy(files.5)?;
+        }
     }
-    let bytes = LearnedValues::from_map(learned_values).serialize();
-    let filename = format!("learned{}", id);
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(filename)?;
-    file.write_all(&bytes)?;
     Ok(())
+}
+
+#[derive(Parser, Debug)]
+enum Mode {
+    Train,
+    Eval,
+}
+
+fn main() -> io::Result<()> {
+    let mode = Mode::parse();
+    match mode {
+        Mode::Train => dqn_train(),
+        Mode::Eval => dqn_eval(),
+    }
 }

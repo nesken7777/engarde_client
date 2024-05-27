@@ -1,10 +1,3 @@
-use num_traits::ToBytes;
-use rurel::{
-    mdp::{Agent, State},
-    strategy::{explore::ExplorationStrategy, learn::QLearning, terminate::SinkStates},
-    AgentTrainer,
-};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     env::args,
@@ -13,6 +6,18 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     net::{SocketAddr, TcpStream},
 };
+
+use clap::Parser;
+use rurel::{
+    mdp::{Agent, State},
+    strategy::{
+        explore::{ExplorationStrategy, RandomExploration},
+        learn::QLearning,
+        terminate::SinkStates,
+    },
+    AgentTrainer,
+};
+use serde::{Deserialize, Serialize};
 
 use engarde_client::{
     algorithm::{self, RestCards},
@@ -28,7 +33,7 @@ use engarde_client::{
 struct BestExploration(AgentTrainer<MyState>);
 
 impl BestExploration {
-     fn new(trainer: AgentTrainer<MyState>) -> BestExploration {
+    fn new(trainer: AgentTrainer<MyState>) -> BestExploration {
         BestExploration(trainer)
     }
 }
@@ -316,11 +321,11 @@ impl LearnedValues {
         LearnedValues(state_map)
     }
 
-     fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
+    fn get(self) -> HashMap<MyState, HashMap<Action, f64>> {
         self.0
     }
 
-     fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
+    fn from_map(map: HashMap<MyState, HashMap<Action, f64>>) -> Self {
         LearnedValues(map)
     }
 }
@@ -428,7 +433,89 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
- fn main() -> io::Result<()> {
+fn q_train() -> io::Result<()> {
+    let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
+    // ファイル読み込み
+    let path = format!("learned{}", id);
+    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
+    {
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        LearnedValues::deserialize(&data).get()
+    } else {
+        HashMap::new()
+    };
+
+    let loop_kaisuu = (|| args().nth(2)?.parse::<usize>().ok())().unwrap_or(1);
+
+    for _ in 0..loop_kaisuu {
+        let mut trainer = AgentTrainer::new();
+        trainer.import_state(learned_values.clone());
+
+        // 吐き出された学習内容を取り込む
+        let mut trainer2 = AgentTrainer::new();
+        trainer2.import_state(learned_values);
+
+        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+        let stream = loop {
+            if let Ok(stream) = TcpStream::connect(addr) {
+                break stream;
+            }
+        };
+        let (mut bufreader, mut bufwriter) =
+            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+        let id = get_id(&mut bufreader)?;
+        let player_name = PlayerName::new("qai".to_string());
+        send_info(&mut bufwriter, &player_name)?;
+        let _ = read_stream(&mut bufreader)?;
+
+        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+        let mut board_info_init = BoardInfo::new();
+
+        let hand_info = loop {
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(Messages::BoardInfo(board_info)) => {
+                    board_info_init = board_info;
+                }
+                Ok(Messages::HandInfo(hand_info)) => {
+                    break hand_info;
+                }
+                Ok(_) | Err(_) => {}
+            }
+        };
+        let mut hand_vec = hand_info.to_vec();
+        hand_vec.sort();
+        // AI用エージェント作成
+        let mut agent = MyAgent::new(
+            id,
+            hand_vec,
+            board_info_init.player_position_0,
+            board_info_init.player_position_1,
+            bufreader,
+            bufwriter,
+        );
+
+        //トレーニング開始
+        trainer.train(
+            &mut agent,
+            &QLearning::new(0.2, 0.7, 0.0),
+            &mut SinkStates {},
+            &RandomExploration,
+        );
+        learned_values = trainer.export_learned_values();
+    }
+    let bytes = LearnedValues::from_map(learned_values).serialize();
+    let filename = format!("learned{}", id);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(filename)?;
+    file.write_all(&bytes)?;
+    Ok(())
+}
+
+fn q_eval() -> io::Result<()> {
     let id = (|| args().nth(1)?.parse::<u8>().ok())().unwrap_or(0);
     // ファイル読み込み
     let path = format!("learned{}", id);
@@ -509,4 +596,18 @@ impl Agent<MyState> for MyAgent {
     file.write_all(&bytes)?;
 
     Ok(())
+}
+
+#[derive(Parser, Debug)]
+enum Mode {
+    Train,
+    Eval,
+}
+
+fn main() -> io::Result<()> {
+    let mode = Mode::parse();
+    match mode {
+        Mode::Train => q_train(),
+        Mode::Eval => q_eval(),
+    }
 }
