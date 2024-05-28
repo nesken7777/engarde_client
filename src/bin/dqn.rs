@@ -70,7 +70,11 @@ impl ExplorationStrategy<MyState> for BestExplorationDqn {
             .0;
 
         // そのインデックスでアクションに変換
-        Action::from_index(action_index)
+        let action = Action::from_index(action_index);
+
+        // 行動
+        agent.take_action(&action);
+        action
     }
 }
 
