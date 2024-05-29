@@ -1,13 +1,8 @@
+use engarde_client::states::{Action, Direction, Movement};
 use num_rational::Ratio;
-use num_traits::identities::{One, Zero};
-use serde::de::value::Error;
-use serde::{Deserialize, Serialize};
 
-use crate::algorithm::{used_card, ProbabilityTable, RestCards};
-use crate::protocol::{Action, Attack, Direction, Movement, Played};
-use core::panic;
-use std::ops::{Deref, Index, IndexMut};
-use std::vec;
+use crate::algorithm::{ProbabilityTable, RestCards};
+use std::ops::{Index, IndexMut};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
@@ -179,14 +174,22 @@ pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
     }
 }
 
-pub fn normal_move(hands: &[u8; 5], distance: u8,rest:RestCards,table:ProbabilityTable) -> Option<Action> {
-    let acceptable=AcceptableNumbers::new(hands, rest);
+pub fn normal_move(
+    hands: &[u8; 5],
+    distance: u8,
+    rest: RestCards,
+    table: ProbabilityTable,
+) -> Option<Action> {
+    let acceptable = AcceptableNumbers::new(hands, rest);
     let togo7 = action_togo(7, distance);
     let togo2 = action_togo(2, distance);
-    let movement_togo7 = togo7.and_then(|act|act.get_movement());
-    let movement_togo2 = togo2.and_then(|act|act.get_movement());
+    let movement_togo7 = togo7.and_then(|act| act.get_movement());
+    let movement_togo2 = togo2.and_then(|act| act.get_movement());
     if let Some(movement) = movement_togo7 {
-        if hands[movement.card as usize] != 0 && movement.direction == Direction::Forward&&acceptable[movement.card as usize] {
+        if hands[movement.card as usize] != 0
+            && movement.direction == Direction::Forward
+            && acceptable[movement.card as usize]
+        {
             return togo7;
         }
     };
@@ -195,6 +198,6 @@ pub fn normal_move(hands: &[u8; 5], distance: u8,rest:RestCards,table:Probabilit
             return togo2;
         }
     };
-    
-    None 
+
+    None
 }

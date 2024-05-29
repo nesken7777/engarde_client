@@ -7,6 +7,8 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
+use crate::states::{Attack, Movement};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
     Zero,
@@ -209,129 +211,6 @@ pub struct Accept {
     to: String,
     #[serde(rename = "MessageID")]
     message_id: String,
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum Direction {
-    Forward,
-    Back,
-}
-
-impl Direction {
-    pub fn denote(&self) -> u8 {
-        match self {
-            Self::Forward => 0,
-            Self::Back => 1,
-        }
-    }
-}
-
-impl Display for Direction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Forward => write!(f, "F"),
-            Self::Back => write!(f, "B"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct Movement {
-    pub card: u8,
-    pub direction: Direction,
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct Attack {
-    pub card: u8,
-    pub quantity: u8,
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum Action {
-    Move(Movement),
-    Attack(Attack),
-}
-
-impl Action {
-    pub fn as_index(&self) -> usize {
-        match self {
-            Action::Move(movement) => {
-                let &Movement { card, direction } = movement;
-                match direction {
-                    Direction::Forward => card as usize - 1,
-                    Direction::Back => 5 + (card as usize - 1),
-                }
-            }
-            Action::Attack(attack) => {
-                let &Attack { card, quantity } = attack;
-                5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)
-            }
-        }
-    }
-    pub fn from_index(idx: usize) -> Action {
-        match idx {
-            x @ 0..=4 => Action::Move(Movement {
-                card: (x + 1) as u8,
-                direction: Direction::Forward,
-            }),
-            x @ 5..=9 => Action::Move(Movement {
-                card: (x - 5 + 1) as u8,
-                direction: Direction::Back,
-            }),
-            x @ 10..=34 => {
-                let x = x - 10;
-                Action::Attack(Attack {
-                    card: (x / 5 + 1) as u8,
-                    quantity: (x % 5 + 1) as u8,
-                })
-            }
-            _ => unreachable!(),
-        }
-    }
-    pub fn get_movement(self) -> Option<Movement> {
-        match self {
-            Action::Move(movement) => Some(movement),
-            Action::Attack(_) => None,
-        }
-    }
-}
-
-impl From<Action> for [f32; 35] {
-    fn from(value: Action) -> Self {
-        let mut arr = [0f32; 35];
-        arr[value.as_index()] = 1.0;
-        arr
-    }
-}
-
-impl From<[f32; 35]> for Action {
-    fn from(value: [f32; 35]) -> Self {
-        match value
-            .into_iter()
-            .enumerate()
-            .max_by(|&(_, x), &(_, y)| x.total_cmp(&y))
-            .map(|(i, _)| i)
-            .unwrap()
-        {
-            x @ 0..=4 => Action::Move(Movement {
-                card: (x + 1) as u8,
-                direction: Direction::Forward,
-            }),
-            x @ 5..=9 => Action::Move(Movement {
-                card: (x - 5 + 1) as u8,
-                direction: Direction::Back,
-            }),
-            x @ 10..=34 => {
-                let x = x - 10;
-                Action::Attack(Attack {
-                    card: (x / 5 + 1) as u8,
-                    quantity: (x % 5 + 1) as u8,
-                })
-            }
-            _ => unreachable!(),
-        }
-    }
 }
 
 #[derive(Deserialize, Debug)]

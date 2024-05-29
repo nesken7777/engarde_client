@@ -21,12 +21,9 @@ use serde::{Deserialize, Serialize};
 use engarde_client::{
     algorithm::{self, RestCards},
     get_id, print,
-    protocol::{
-        self, Action, Attack, BoardInfo,
-        Direction::{Back, Forward},
-        Evaluation, Messages, Movement, PlayAttack, PlayMovement, PlayerID, PlayerName,
-    },
+    protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info,
+    states::{Action, Attack, Direction, Movement},
 };
 
 struct BestExploration(AgentTrainer<MyState>);
@@ -118,7 +115,7 @@ impl State for MyState {
         fn attack_cards(hands: &[u8], card: u8) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             if have > 0 {
-                Some(Action::Attack(protocol::Attack {
+                Some(Action::Attack(Attack {
                     card,
                     quantity: have as u8,
                 }))
@@ -127,6 +124,7 @@ impl State for MyState {
             }
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: u8) -> Vec<Action> {
+            use Direction::*;
             match (for_back, for_forward) {
                 (true, true) => vec![
                     Action::Move(Movement {
@@ -297,8 +295,8 @@ impl LearnedValues {
                 let action = match action_bytes[0] {
                     0 => {
                         let direction = match property_bytes[0] {
-                            0 => Forward,
-                            1 => Back,
+                            0 => Direction::Forward,
+                            1 => Direction::Back,
                             _ => unreachable!(),
                         };
                         Action::Move(Movement {

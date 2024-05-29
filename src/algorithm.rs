@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use std::ops::{Deref, Index, IndexMut};
 
-use crate::protocol::{Action, Attack, Direction, Movement, Played};
+use crate::{
+    protocol::Played,
+    states::{Action, Attack, Direction, Movement},
+};
 
 const HANDS_DEFAULT_U8: u8 = 5;
 const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
@@ -262,7 +265,6 @@ pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
     }
 }
 pub fn win_poss_attack(
-
     // カード番号がiのやつが墓地に何枚あるかを示す
     rest_cards: &RestCards,
     // 手札(ソート済み)
@@ -320,27 +322,23 @@ pub fn last_move(
         }
         reachable_vec
     }
-    let mut return_value=None;
+    let mut return_value = None;
     last = check_last(parried_quant, &restcards);
     match last {
-        
         true => {
-            
             let can_attack = hands[distance as usize - 1] != 0;
             let attack_action = Action::Attack(Attack {
                 card: distance as u8,
                 quantity: hands[distance as usize],
             });
             if can_attack {
-                let possibility =
-                    win_poss_attack( &restcards, hands, table, attack_action);
+                let possibility = win_poss_attack(&restcards, hands, table, attack_action);
                 if possibility == Ratio::one() {
-                    return_value=Some(distance as u64);
+                    return_value = Some(distance as u64);
                 }
-            
+            }
+            return_value
         }
-        return_value
-    }
         false => None,
     }
 }

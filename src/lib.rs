@@ -6,6 +6,7 @@ use std::{
 use protocol::{ConnectionStart, PlayerID};
 use serde::Serialize;
 
+pub mod states;
 pub mod algorithm;
 pub mod errors;
 pub mod protocol;

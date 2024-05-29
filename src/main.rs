@@ -1,13 +1,16 @@
-mod algorithm2;
 mod algorithm;
+mod algorithm2;
 mod errors;
 mod protocol;
+mod states;
 use algorithm::RestCards;
-use engarde_client::{get_id, print, protocol::PlayerID, read_stream, send_info};
-use protocol::{
-    Action, Attack, BoardInfo, Direction, Evaluation, Messages, Movement, PlayAttack, PlayMovement,
-    PlayerName,
+use engarde_client::{
+    get_id, print,
+    protocol::PlayerID,
+    read_stream, send_info,
+    states::{Action, Attack, Direction, Movement},
 };
+use protocol::{BoardInfo, Evaluation, Messages, PlayerName};
 use std::{
     io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
@@ -129,12 +132,12 @@ fn act(
     match action {
         Action::Move(movement) => {
             cards[(movement.card - 1) as usize] -= 1;
-            send_info(bufwriter, &PlayMovement::from_info(movement))?;
+            // send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
             cards[(attack.card - 1) as usize] =
                 cards[(attack.card - 1) as usize].saturating_sub(attack.quantity * 2);
-            send_info(bufwriter, &PlayAttack::from_info(attack))?;
+            // send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }
     Ok(())
