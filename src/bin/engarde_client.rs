@@ -1,16 +1,10 @@
-mod algorithm;
-mod algorithm2;
-mod errors;
-mod protocol;
-mod states;
-use algorithm::RestCards;
 use engarde_client::{
+    algorithm::{used_card, RestCards},
     get_id, print,
-    protocol::PlayerID,
+    protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{Action, Attack, Direction, Movement},
 };
-use protocol::{BoardInfo, Evaluation, Messages, PlayerName};
 use std::{
     io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
@@ -197,7 +191,7 @@ fn main() -> io::Result<()> {
                         print("エラーもらった")?;
                         act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
                     }
-                    Messages::Played(played) => algorithm::used_card(&mut cards, played),
+                    Messages::Played(played) => used_card(&mut cards, played),
                     Messages::RoundEnd(_round_end) => {
                         print("ラウンド終わり!")?;
                         cards = RestCards::new();

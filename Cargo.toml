@@ -22,6 +22,9 @@ serde_with = { version = "3.7.0", default-features = false, features = [
 rurel = { path = "rurel" }
 
 [[bin]]
+name = "engarde_client"
+
+[[bin]]
 name = "q-learning"
 
 [[bin]]
