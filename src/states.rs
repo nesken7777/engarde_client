@@ -10,7 +10,10 @@ use rurel::mdp::{Agent, State};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    algorithm::{self, RestCards}, print, protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID}, read_stream, send_info
+    algorithm::{self, RestCards},
+    print,
+    protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID},
+    read_stream, send_info,
 };
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -150,6 +153,62 @@ pub struct MyState {
 }
 
 impl MyState {
+    pub fn hands(&self) -> &[u8] {
+        &self.hands
+    }
+
+    pub fn my_id(&self) -> PlayerID {
+        self.my_id
+    }
+
+    pub fn rest_cards(&self) -> RestCards {
+        self.cards
+    }
+
+    pub fn p0_score(&self) -> u32 {
+        self.p0_score
+    }
+
+    pub fn p1_score(&self) -> u32 {
+        self.p1_score
+    }
+
+    pub fn p0_position(&self) -> u8 {
+        self.p0_position
+    }
+
+    pub fn p1_position(&self) -> u8 {
+        self.p1_position
+    }
+
+    pub fn game_end(&self) -> bool {
+        self.game_end
+    }
+
+    // いやごめんてclippy
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        my_id: PlayerID,
+        hands: Vec<u8>,
+        cards: RestCards,
+        p0_score: u32,
+        p1_score: u32,
+        p0_position: u8,
+        p1_position: u8,
+        game_end: bool,
+    ) -> Self {
+        Self {
+            my_id,
+            hands,
+            cards,
+            p0_score,
+            p1_score,
+            p0_position,
+            p1_position,
+            game_end,
+        }
+    }
+
     fn my_score(&self) -> u32 {
         match self.my_id {
             PlayerID::Zero => self.p0_score,

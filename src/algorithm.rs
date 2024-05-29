@@ -17,7 +17,7 @@ const MAX_ID: usize = 5;
 const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
 
 //残りのカード枚数(種類ごと)
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub struct RestCards {
     cards: [u8; MAX_ID],
 }
