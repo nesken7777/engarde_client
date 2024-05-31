@@ -23,7 +23,7 @@ use engarde_client::{
     get_id,
     protocol::{BoardInfo, Messages, PlayerName},
     read_stream, send_info,
-    states::{Action, MyAgent, MyState}
+    states::{Action, MyAgent, MyState},
 };
 
 struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
@@ -82,109 +82,107 @@ fn files_name(id: u8) -> (String, String, String, String, String, String) {
     )
 }
 
-fn dqn_train(loop_count: usize) -> io::Result<()> {
+fn dqn_train() -> io::Result<()> {
     let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(1.0, 0.2);
-    for _ in 0..loop_count {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
-        let stream = loop {
-            if let Ok(stream) = TcpStream::connect(addr) {
-                break stream;
-            }
-        };
-        let (mut bufreader, mut bufwriter) =
-            (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
-        let id = get_id(&mut bufreader)?;
-        let player_name = PlayerName::new("dqnai".to_string());
-        send_info(&mut bufwriter, &player_name)?;
-        let _ = read_stream(&mut bufreader)?;
-        // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-        let mut board_info_init = BoardInfo::new();
-
-        let hand_info = loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(Messages::BoardInfo(board_info)) => {
-                    board_info_init = board_info;
-                }
-                Ok(Messages::HandInfo(hand_info)) => {
-                    break hand_info;
-                }
-                Ok(_) | Err(_) => {}
-            }
-        };
-        let mut hand_vec = hand_info.to_vec();
-        hand_vec.sort();
-        // AI用エージェント作成
-        let mut agent = MyAgent::new(
-            id,
-            hand_vec,
-            board_info_init.player_position_0,
-            board_info_init.player_position_1,
-            bufreader,
-            bufwriter,
-        );
-        let past_exp = {
-            let cpu = Cpu::default();
-            let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
-            let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-            let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
-            let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-            let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
-            let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
-            let files = files_name(id.denote());
-            (|| {
-                weight0.load_from_npy(files.0).ok()?;
-                bias0.load_from_npy(files.1).ok()?;
-                weight1.load_from_npy(files.2).ok()?;
-                bias1.load_from_npy(files.3).ok()?;
-                weight2.load_from_npy(files.4).ok()?;
-                bias2.load_from_npy(files.5).ok()?;
-                Some(())
-            })()
-            .map_or(trainer.export_learned_values(), |_| {
-                (
-                    (
-                        Linear {
-                            weight: weight0,
-                            bias: bias0,
-                        },
-                        ReLU,
-                    ),
-                    (
-                        Linear {
-                            weight: weight1,
-                            bias: bias1,
-                        },
-                        ReLU,
-                    ),
-                    Linear {
-                        weight: weight2,
-                        bias: bias2,
-                    },
-                )
-            })
-        };
-        trainer.import_model(past_exp);
-        trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
-        {
-            let learned_values = trainer.export_learned_values();
-            let linear0 = learned_values.0 .0;
-            let weight0 = linear0.weight;
-            let bias0 = linear0.bias;
-            let linear1 = learned_values.1 .0;
-            let weight1 = linear1.weight;
-            let bias1 = linear1.bias;
-            let linear2 = learned_values.2;
-            let weight2 = linear2.weight;
-            let bias2 = linear2.bias;
-            let files = files_name(id.denote());
-            let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
-            weight0.save_to_npy(files.0)?;
-            bias0.save_to_npy(files.1)?;
-            weight1.save_to_npy(files.2)?;
-            bias1.save_to_npy(files.3)?;
-            weight2.save_to_npy(files.4)?;
-            bias2.save_to_npy(files.5)?;
+    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+    let stream = loop {
+        if let Ok(stream) = TcpStream::connect(addr) {
+            break stream;
         }
+    };
+    let (mut bufreader, mut bufwriter) =
+        (BufReader::new(stream.try_clone()?), BufWriter::new(stream));
+    let id = get_id(&mut bufreader)?;
+    let player_name = PlayerName::new("dqnai".to_string());
+    send_info(&mut bufwriter, &player_name)?;
+    let _ = read_stream(&mut bufreader)?;
+    // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
+    let mut board_info_init = BoardInfo::new();
+
+    let hand_info = loop {
+        match Messages::parse(&read_stream(&mut bufreader)?) {
+            Ok(Messages::BoardInfo(board_info)) => {
+                board_info_init = board_info;
+            }
+            Ok(Messages::HandInfo(hand_info)) => {
+                break hand_info;
+            }
+            Ok(_) | Err(_) => {}
+        }
+    };
+    let mut hand_vec = hand_info.to_vec();
+    hand_vec.sort();
+    // AI用エージェント作成
+    let mut agent = MyAgent::new(
+        id,
+        hand_vec,
+        board_info_init.player_position_0,
+        board_info_init.player_position_1,
+        bufreader,
+        bufwriter,
+    );
+    let past_exp = {
+        let cpu = Cpu::default();
+        let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
+        let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+        let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
+        let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
+        let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
+        let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+        let files = files_name(id.denote());
+        (|| {
+            weight0.load_from_npy(files.0).ok()?;
+            bias0.load_from_npy(files.1).ok()?;
+            weight1.load_from_npy(files.2).ok()?;
+            bias1.load_from_npy(files.3).ok()?;
+            weight2.load_from_npy(files.4).ok()?;
+            bias2.load_from_npy(files.5).ok()?;
+            Some(())
+        })()
+        .map_or(trainer.export_learned_values(), |_| {
+            (
+                (
+                    Linear {
+                        weight: weight0,
+                        bias: bias0,
+                    },
+                    ReLU,
+                ),
+                (
+                    Linear {
+                        weight: weight1,
+                        bias: bias1,
+                    },
+                    ReLU,
+                ),
+                Linear {
+                    weight: weight2,
+                    bias: bias2,
+                },
+            )
+        })
+    };
+    trainer.import_model(past_exp);
+    trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
+    {
+        let learned_values = trainer.export_learned_values();
+        let linear0 = learned_values.0 .0;
+        let weight0 = linear0.weight;
+        let bias0 = linear0.bias;
+        let linear1 = learned_values.1 .0;
+        let weight1 = linear1.weight;
+        let bias1 = linear1.bias;
+        let linear2 = learned_values.2;
+        let weight2 = linear2.weight;
+        let bias2 = linear2.bias;
+        let files = files_name(id.denote());
+        let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
+        weight0.save_to_npy(files.0)?;
+        bias0.save_to_npy(files.1)?;
+        weight1.save_to_npy(files.2)?;
+        bias1.save_to_npy(files.3)?;
+        weight2.save_to_npy(files.4)?;
+        bias2.save_to_npy(files.5)?;
     }
     Ok(())
 }
@@ -292,14 +290,12 @@ enum Mode {
 struct Arguments {
     #[arg(long, short)]
     mode: Mode,
-    #[arg(long, short, default_value_t = 1)]
-    loop_count: usize,
 }
 
 fn main() -> io::Result<()> {
     let args = Arguments::parse();
     match args.mode {
-        Mode::Train => dqn_train(args.loop_count),
+        Mode::Train => dqn_train(),
         Mode::Eval => dqn_eval(),
     }
 }
