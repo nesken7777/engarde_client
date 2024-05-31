@@ -7,13 +7,6 @@ use crate::{
     states::{Action, Attack, Direction, Movement, MyState},
 };
 
-const HANDS_DEFAULT_U8: u8 = 5;
-const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
-const MAX_MAISUU_OF_ID_U8: u8 = 5;
-const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
-const MAX_ID: usize = 5;
-const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
-
 //指定されたcard_idのカードを使用可能かを決める構造体
 pub struct AcceptableNumbers {
     can_use: [bool; 5],
@@ -145,8 +138,7 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
         .iter()
         .map(|i| distance as i8 + *i as i8)
         .collect::<Vec<_>>();
-    let vec = [vec1, vec2].concat();
-    vec
+    [vec1, vec2].concat()
 }
 //nが指定する距離に行くために行うActionを返す
 pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
@@ -223,20 +215,21 @@ pub fn middle_move(
     distance: u8,
     rest: &RestCards,
     table: &ProbabilityTable,
-    state: MyState,
+
 ) -> Option<Action> {
-    let action = Action::Attack(Attack {
+    let att_action = Action::Attack(Attack {
         card: distance,
         quantity: hands[(distance - 1) as usize],
     });
     //優先度高い
-    if algorithm::win_poss_attack(rest, hands, table, action) > Ratio::from_integer(3) / 4 {
-        return Some(action);
+    if algorithm::win_poss_attack(rest, hands, table, att_action) > Ratio::from_integer(3) / 4 {
+        return Some(att_action);
     }
     if let Some(act) = should_go_2_7(hands, distance, rest, table) {
-        if safe_possibility(distance, rest, hands, table, act) == Ratio::from_integer(1) {
+        if safe_possibility(distance, rest, hands, table, act) == Ratio::from_integer(3)/4 {
             return Some(act);
         }
     }
+    
     None
 }
