@@ -3,7 +3,7 @@ use std::ops::{Index, IndexMut};
 use num_rational::Ratio;
 
 use crate::{
-    algorithm::{self, safe_possibility, ProbabilityTable},
+    algorithm::{safe_possibility, win_poss_attack, ProbabilityTable},
     states::{Action, Attack, Direction, Movement, RestCards},
 };
 
@@ -225,21 +225,12 @@ pub fn middle_move(
         None
     };
     //優先度高い
-    let att_action = att_action.and_then(|att_action| {
-        if algorithm::win_poss_attack(rest, hands, table, att_action) > Ratio::from_integer(3) / 4 {
-            Some(att_action)
-        } else {
-            None
-        }
+    let att_action = att_action.filter(|&att_action| {
+        win_poss_attack(rest, hands, table, att_action) >= Ratio::from_integer(3) / 4
     });
 
-    let mov_action = should_go_2_7(hands, distance, rest, table).and_then(|mov_action| {
-        if safe_possibility(distance, rest, hands, table, mov_action) == Ratio::from_integer(3) / 4
-        {
-            Some(mov_action)
-        } else {
-            None
-        }
+    let mov_action = should_go_2_7(hands, distance, rest, table).filter(|&mov_action| {
+        safe_possibility(distance, rest, hands, table, mov_action) >= Ratio::from_integer(3) / 4
     });
 
     att_action.or(mov_action)
