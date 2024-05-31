@@ -326,7 +326,7 @@ impl MyState {
 impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
-        (self.my_score() as f64) - (self.enemy_score() as f64)
+        (self.my_score() as f64 * 200.0).powi(2) - (self.enemy_score() as f64 * 200.0).powi(2)
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
