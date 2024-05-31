@@ -248,13 +248,7 @@ impl MyState {
 impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
-        let point3 = {
-            let factor = self.distance_from_center() as f64 * 20.0;
-            factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
-        };
-        let point4 = (self.my_score() as f64 * 2000.0).powi(2)
-            - (self.enemy_score() as f64 * 2000.0).powi(2);
-        point3 + point4
+        (self.my_score() as f64) - (self.enemy_score() as f64)
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
