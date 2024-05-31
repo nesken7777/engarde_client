@@ -111,15 +111,15 @@ pub fn initial_move(
     let average = calc_ave(hands);
     //clippyに従うとエラーになった
     if average < Ratio::from_integer(3) {
-        return Ok(Action::Move(Movement {
+        Ok(Action::Move(Movement {
             card: 2,
             direction: Direction::Forward,
-        }));
+        }))
     } else {
-        return Ok(Action::Move(Movement {
+        Ok(Action::Move(Movement {
             card: 5,
             direction: Direction::Forward,
-        }));
+        }))
     }
 }
 //自分の手札で到達し得る相手との距離のvecを返す。
