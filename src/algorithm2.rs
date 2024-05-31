@@ -1,15 +1,11 @@
-use engarde_client::states::{Action, Direction, Movement};
-use num_rational::Ratio;
-
-use crate::algorithm::{ProbabilityTable, RestCards};
 use std::ops::{Index, IndexMut};
 
-const HANDS_DEFAULT_U8: u8 = 5;
-const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
-const MAX_MAISUU_OF_ID_U8: u8 = 5;
-const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
-const MAX_ID: usize = 5;
-const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
+use num_rational::Ratio;
+
+use crate::{
+    algorithm::{self, safe_possibility, ProbabilityTable, RestCards},
+    states::{Action, Attack, Direction, Movement, MyState},
+};
 
 //指定されたcard_idのカードを使用可能かを決める構造体
 pub struct AcceptableNumbers {
@@ -35,30 +31,34 @@ impl AcceptableNumbers {
     }
 
     //4と5は合計二枚以上あるなら使用可能
-    fn can_use4and5(hands: &[u8; 5]) -> bool {
-        count_4and5(hands) >= 2
+    fn can_use4and5(hands: &[u8; 5], distance: u8) -> bool {
+        if distance >= 12 {
+            count_4and5(hands) >= 2
+        } else {
+            true
+        }
     }
     fn can_use3(hands: &[u8; 5]) -> bool {
         hands[2] > 0
     }
-    //三枚以上2があるなら使ってもよい
+    //二枚以上2があるなら使ってもよい
     fn can_use2(hands: &[u8; 5]) -> bool {
-        hands[1] > 2
+        hands[1] > 1
     }
 
     //1が3枚以上あるなら使ってもよい
-    fn can_use1(hands: &[u8; 5], rest: RestCards) -> bool {
+    fn can_use1(hands: &[u8; 5], rest: &RestCards) -> bool {
         let usedcard_1 = 5 - rest[0];
         hands[0] > 3 - usedcard_1
     }
     //初期化
-    fn new(hands: &[u8; 5], rest: RestCards) -> AcceptableNumbers {
+    fn new(hands: &[u8; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
         let can_use = [
             Self::can_use1(hands, rest),
             Self::can_use2(hands),
             Self::can_use3(hands),
-            Self::can_use4and5(hands),
-            Self::can_use4and5(hands),
+            Self::can_use4and5(hands, distance),
+            Self::can_use4and5(hands, distance),
         ];
         AcceptableNumbers { can_use }
     }
@@ -124,8 +124,8 @@ pub fn initial_move(
 }
 //自分の手札で到達し得る相手との距離のvecを返す。
 pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
-    let mut vec1 = hands
-        .into_iter()
+    let vec1 = hands
+        .iter()
         .map(|i| {
             if distance as i8 - *i as i8 > 0 {
                 distance as i8 - *i as i8
@@ -134,12 +134,11 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
             }
         })
         .collect::<Vec<_>>();
-    let mut vec2 = hands
-        .into_iter()
+    let vec2 = hands
+        .iter()
         .map(|i| distance as i8 + *i as i8)
         .collect::<Vec<_>>();
-    let vec = [vec1, vec2].concat();
-    vec
+    [vec1, vec2].concat()
 }
 //nが指定する距離に行くために行うActionを返す
 pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
@@ -174,17 +173,22 @@ pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
     }
 }
 
-pub fn normal_move(
+//主に7と2の距離になるように調整するプログラム。優先度3
+pub fn should_go_2_7(
     hands: &[u8; 5],
     distance: u8,
-    rest: RestCards,
-    table: ProbabilityTable,
+    rest: &RestCards,
+    table: &ProbabilityTable,
 ) -> Option<Action> {
-    let acceptable = AcceptableNumbers::new(hands, rest);
+    let acceptable = AcceptableNumbers::new(hands, rest, distance);
+
     let togo7 = action_togo(7, distance);
     let togo2 = action_togo(2, distance);
     let movement_togo7 = togo7.and_then(|act| act.get_movement());
     let movement_togo2 = togo2.and_then(|act| act.get_movement());
+
+    //7の距離に行くべき状態か判断する
+
     if let Some(movement) = movement_togo7 {
         if hands[movement.card as usize] != 0
             && movement.direction == Direction::Forward
@@ -193,11 +197,39 @@ pub fn normal_move(
             return togo7;
         }
     };
+    //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[movement.card as usize] != 0 && movement.direction == Direction::Forward {
+        if hands[movement.card as usize] != 0
+            && movement.direction == Direction::Forward
+            && acceptable[movement.card as usize]
+        {
             return togo2;
         }
     };
 
+    None
+}
+
+pub fn middle_move(
+    hands: &[u8; 5],
+    distance: u8,
+    rest: &RestCards,
+    table: &ProbabilityTable,
+
+) -> Option<Action> {
+    let att_action = Action::Attack(Attack {
+        card: distance,
+        quantity: hands[(distance - 1) as usize],
+    });
+    //優先度高い
+    if algorithm::win_poss_attack(rest, hands, table, att_action) > Ratio::from_integer(3) / 4 {
+        return Some(att_action);
+    }
+    if let Some(act) = should_go_2_7(hands, distance, rest, table) {
+        if safe_possibility(distance, rest, hands, table, act) == Ratio::from_integer(3)/4 {
+            return Some(act);
+        }
+    }
+    
     None
 }

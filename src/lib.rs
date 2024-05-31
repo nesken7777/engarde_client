@@ -10,6 +10,7 @@ pub mod states;
 pub mod algorithm;
 pub mod errors;
 pub mod protocol;
+pub mod algorithm2;
 
 pub fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();
