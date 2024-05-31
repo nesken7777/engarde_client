@@ -1,4 +1,4 @@
-use engarde_client::states::{Action, Direction, Movement};
+use crate::states::{Action, Direction, Movement};
 use num_rational::Ratio;
 
 use crate::algorithm::{ProbabilityTable, RestCards};
