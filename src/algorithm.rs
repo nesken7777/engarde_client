@@ -1,59 +1,10 @@
 use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
-use serde::{Deserialize, Serialize};
 
-use std::ops::{Deref, Index, IndexMut};
-
-use crate::{
-    protocol::Played,
-    states::{Action, Attack, Direction, Movement},
+use crate::states::{
+    Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
+    MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
 };
-
-const HANDS_DEFAULT_U8: u8 = 5;
-const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
-const MAX_MAISUU_OF_ID_U8: u8 = 5;
-const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
-const MAX_ID: usize = 5;
-const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
-
-//残りのカード枚数(種類ごと)
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
-pub struct RestCards {
-    cards: [u8; MAX_ID],
-}
-
-impl RestCards {
-    pub fn new() -> Self {
-        Self {
-            cards: [MAX_MAISUU_OF_ID_U8; MAX_ID],
-        }
-    }
-    pub fn from_slice(slice: &[u8]) -> RestCards {
-        RestCards {
-            cards: slice.try_into().unwrap(),
-        }
-    }
-}
-
-impl Index<usize> for RestCards {
-    type Output = u8;
-    fn index(&self, index: usize) -> &Self::Output {
-        self.cards.get(index).expect("out of bound")
-    }
-}
-
-impl IndexMut<usize> for RestCards {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.cards.get_mut(index).expect("out of bound")
-    }
-}
-
-impl Deref for RestCards {
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        &self.cards
-    }
-}
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
@@ -110,19 +61,6 @@ fn permutation(n: u64, r: u64) -> u64 {
 fn combination(n: u64, r: u64) -> u64 {
     let perm = permutation(n, r);
     perm / (1..=r).product::<u64>()
-}
-
-pub fn used_card(cards: &mut RestCards, message: Played) {
-    match message {
-        Played::MoveMent(movement) => {
-            let i: usize = movement.play_card.into();
-            cards[i - 1] -= 1;
-        }
-        Played::Attack(attack) => {
-            let i: usize = attack.play_card.into();
-            cards[i - 1] = cards[i - 1].saturating_sub(attack.num_of_card * 2);
-        }
-    }
 }
 
 /// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にi枚ある確率のリスト(添え字i)

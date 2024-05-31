@@ -4,17 +4,76 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter},
     net::TcpStream,
+    ops::{Deref, Index, IndexMut},
 };
 
 use rurel::mdp::{Agent, State};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    algorithm::{self, RestCards},
     print,
-    protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID},
+    protocol::{Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
     read_stream, send_info,
 };
+
+pub const HANDS_DEFAULT_U8: u8 = 5;
+pub const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
+pub const MAX_MAISUU_OF_ID_U8: u8 = 5;
+pub const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
+pub const MAX_ID: usize = 5;
+pub const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
+
+//残りのカード枚数(種類ごと)
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+pub struct RestCards {
+    cards: [u8; MAX_ID],
+}
+
+impl RestCards {
+    pub fn new() -> Self {
+        Self {
+            cards: [MAX_MAISUU_OF_ID_U8; MAX_ID],
+        }
+    }
+    pub fn from_slice(slice: &[u8]) -> RestCards {
+        RestCards {
+            cards: slice.try_into().unwrap(),
+        }
+    }
+}
+
+impl Index<usize> for RestCards {
+    type Output = u8;
+    fn index(&self, index: usize) -> &Self::Output {
+        self.cards.get(index).expect("out of bound")
+    }
+}
+
+impl IndexMut<usize> for RestCards {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.cards.get_mut(index).expect("out of bound")
+    }
+}
+
+impl Deref for RestCards {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.cards
+    }
+}
+
+pub fn used_card(cards: &mut RestCards, action: Action) {
+    match action {
+        Action::Move(movement) => {
+            let i: usize = movement.card.into();
+            cards[i - 1] -= 1;
+        }
+        Action::Attack(attack) => {
+            let i: usize = attack.card.into();
+            cards[i - 1] = cards[i - 1].saturating_sub(attack.quantity * 2);
+        }
+    }
+}
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Direction {
@@ -135,6 +194,25 @@ impl From<[f32; 35]> for Action {
                 })
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+impl Played {
+    pub fn to_action(&self) -> Action {
+        match self {
+            Played::MoveMent(movement) => Action::Move(Movement {
+                card: movement.play_card,
+                direction: match movement.direction.as_str() {
+                    "F" => Direction::Forward,
+                    "B" => Direction::Back,
+                    _ => unreachable!(),
+                },
+            }),
+            Played::Attack(attack) => Action::Attack(Attack {
+                card: attack.play_card,
+                quantity: attack.num_of_card,
+            }),
         }
     }
 }
@@ -454,7 +532,7 @@ impl Agent<MyState> for MyAgent {
                             break;
                         }
                         Played(played) => {
-                            algorithm::used_card(&mut self.state.cards, played);
+                            used_card(&mut self.state.cards, played.to_action());
                             break;
                         }
                         RoundEnd(round_end) => {

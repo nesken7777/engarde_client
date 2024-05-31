@@ -248,6 +248,7 @@ dependencies = [
  "dfdx",
  "num-rational",
  "num-traits",
+ "rand",
  "rurel",
  "serde",
  "serde-aux",

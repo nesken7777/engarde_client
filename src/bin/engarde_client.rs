@@ -1,9 +1,8 @@
 use engarde_client::{
-    algorithm::{used_card, RestCards},
     get_id, print,
     protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},
     read_stream, send_info,
-    states::{Action, Attack, Direction, Movement},
+    states::{used_card, Action, Attack, Direction, Movement, RestCards},
 };
 use std::{
     io::{self, BufReader, BufWriter},
@@ -191,7 +190,7 @@ fn main() -> io::Result<()> {
                         print("エラーもらった")?;
                         act(&mut cards, &my_info, &board_state, &mut bufwriter)?;
                     }
-                    Messages::Played(played) => used_card(&mut cards, played),
+                    Messages::Played(played) => used_card(&mut cards, played.to_action()),
                     Messages::RoundEnd(_round_end) => {
                         print("ラウンド終わり!")?;
                         cards = RestCards::new();

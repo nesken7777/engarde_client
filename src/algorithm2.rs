@@ -3,8 +3,8 @@ use std::ops::{Index, IndexMut};
 use num_rational::Ratio;
 
 use crate::{
-    algorithm::{self, safe_possibility, ProbabilityTable, RestCards},
-    states::{Action, Attack, Direction, Movement, MyState},
+    algorithm::{self, safe_possibility, ProbabilityTable},
+    states::{Action, Attack, Direction, Movement, RestCards},
 };
 
 //指定されたcard_idのカードを使用可能かを決める構造体
@@ -52,7 +52,7 @@ impl AcceptableNumbers {
         hands[0] > 3 - usedcard_1
     }
     //初期化
-    fn new(hands: &[u8; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
+    pub fn new(hands: &[u8; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
         let can_use = [
             Self::can_use1(hands, rest),
             Self::can_use2(hands),
@@ -77,7 +77,7 @@ impl IndexMut<usize> for AcceptableNumbers {
 }
 //手札に存在する4と5の数を数える
 pub fn count_4and5(hands: &[u8; 5]) -> u8 {
-    (4..6).map(|i| hands[i]).sum()
+    (3..5).map(|i| hands[i]).sum()
 }
 //三枚以上持っているカードをtrueにして返す
 pub fn more_than_three(hands: &[u8; 5]) -> Vec<bool> {
@@ -215,21 +215,32 @@ pub fn middle_move(
     distance: u8,
     rest: &RestCards,
     table: &ProbabilityTable,
-
 ) -> Option<Action> {
-    let att_action = Action::Attack(Attack {
-        card: distance,
-        quantity: hands[(distance - 1) as usize],
-    });
+    let att_action = if distance <= 5 {
+        Some(Action::Attack(Attack {
+            card: distance,
+            quantity: hands[(distance - 1) as usize],
+        }))
+    } else {
+        None
+    };
     //優先度高い
-    if algorithm::win_poss_attack(rest, hands, table, att_action) > Ratio::from_integer(3) / 4 {
-        return Some(att_action);
-    }
-    if let Some(act) = should_go_2_7(hands, distance, rest, table) {
-        if safe_possibility(distance, rest, hands, table, act) == Ratio::from_integer(3)/4 {
-            return Some(act);
+    let att_action = att_action.and_then(|att_action| {
+        if algorithm::win_poss_attack(rest, hands, table, att_action) > Ratio::from_integer(3) / 4 {
+            Some(att_action)
+        } else {
+            None
         }
-    }
-    
-    None
+    });
+
+    let mov_action = should_go_2_7(hands, distance, rest, table).and_then(|mov_action| {
+        if safe_possibility(distance, rest, hands, table, mov_action) == Ratio::from_integer(3) / 4
+        {
+            Some(mov_action)
+        } else {
+            None
+        }
+    });
+
+    att_action.or(mov_action)
 }

@@ -10,6 +10,7 @@ clap = { version = "4.5.4", features = ["derive", "cargo"] }
 dfdx = { version = "0.13.0", features = ["numpy"] }
 num-rational = "0.4.1"
 num-traits = "0.2.19"
+rand = "0.8.5"
 rurel = { version = "0.5.1", features = ["dqn"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde-aux = { version = "4.5.0", default-features = false }

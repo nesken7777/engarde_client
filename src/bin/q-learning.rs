@@ -17,11 +17,10 @@ use rurel::{
 };
 
 use engarde_client::{
-    algorithm::RestCards,
     get_id,
     protocol::{BoardInfo, Messages, PlayerID, PlayerName},
     read_stream, send_info,
-    states::{Action, Attack, Direction, Movement, MyAgent, MyState},
+    states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
 };
 
 struct BestExploration(AgentTrainer<MyState>);
