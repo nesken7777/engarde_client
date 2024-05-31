@@ -142,34 +142,16 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
 }
 //nが指定する距離に行くために行うActionを返す
 pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
-    //値を比較する関数
-    fn compare_numbers(num1: i32, num2: i32) -> i8 {
-        match num1.cmp(&num2) {
-            std::cmp::Ordering::Greater => 1,
-            std::cmp::Ordering::Equal => 0,
-            std::cmp::Ordering::Less => -1,
-        }
-    }
-    //行くべき方向を判定する関数
-    fn check_direction(n: i32, distance: i32) -> Option<Direction> {
-        match compare_numbers(n as i32, distance as i32) {
-            1 => Some(Direction::Back),
-            -1 => Some(Direction::Forward),
-            0 => None,
-            _ => unreachable!(),
-        }
-    }
-    let direct = check_direction(n as i32, distance as i32)?;
-    match compare_numbers(n as i32, distance as i32) {
-        1 => Some(Action::Move(Movement {
+    match n.cmp(&distance) {
+        std::cmp::Ordering::Greater => Some(Action::Move(Movement {
             card: n - distance,
-            direction: direct,
+            direction: Direction::Back,
         })),
-        -1 => Some(Action::Move(Movement {
+        std::cmp::Ordering::Less => Some(Action::Move(Movement {
             card: distance - n,
-            direction: direct,
+            direction: Direction::Forward,
         })),
-        _ => None,
+        std::cmp::Ordering::Equal => None,
     }
 }
 
