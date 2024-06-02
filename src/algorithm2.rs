@@ -3,7 +3,7 @@ use std::ops::{Index, IndexMut};
 use num_rational::Ratio;
 
 use crate::{
-    algorithm::{safe_possibility, win_poss_attack, ProbabilityTable},
+    algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable},
     protocol::CardID,
     states::{Action, Attack, Direction, Movement, RestCards},
 };
@@ -194,15 +194,15 @@ pub fn should_go_2_7(
 }
 
 pub fn middle_move(
-    hands: &[u8; 5],
+    hands: &[CardID],
     distance: u8,
     rest: &RestCards,
     table: &ProbabilityTable,
 ) -> Option<Action> {
     let att_action = if distance <= 5 {
         Some(Action::Attack(Attack::new(
-            distance,
-            hands[(distance - 1) as usize],
+            CardID::from_u8(distance).unwrap(),
+            card_map_from_hands(hands)[(distance - 1) as usize],
         )))
     } else {
         None
@@ -212,9 +212,10 @@ pub fn middle_move(
         win_poss_attack(rest, hands, table, att_action) >= Ratio::from_integer(3) / 4
     });
 
-    let mov_action = should_go_2_7(hands, distance, rest, table).filter(|&mov_action| {
-        safe_possibility(distance, rest, hands, table, mov_action) >= Ratio::from_integer(3) / 4
-    });
+    let mov_action =
+        should_go_2_7(&card_map_from_hands(hands), distance, rest, table).filter(|&mov_action| {
+            safe_possibility(distance, rest, hands, table, mov_action) >= Ratio::from_integer(3) / 4
+        });
 
     att_action.or(mov_action)
 }

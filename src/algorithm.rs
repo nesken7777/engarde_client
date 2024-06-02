@@ -1,10 +1,15 @@
+use std::iter;
+
 use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
-use crate::{protocol::CardID, states::{
-    Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
-    MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
-}};
+use crate::{
+    protocol::CardID,
+    states::{
+        Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
+        MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
+    },
+};
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
@@ -48,6 +53,24 @@ impl ProbabilityTable {
             _ => None,
         }
     }
+}
+
+/// 手札からカード番号-枚数表にする
+pub fn card_map_from_hands(hands: &[CardID]) -> [u8; 5] {
+    use CardID::{Five, Four, One, Three, Two};
+    [One, Two, Three, Four, Five]
+        .into_iter()
+        .map(|x| hands.iter().filter(|&&y| x == y).count() as u8)
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap()
+}
+
+/// カード番号-枚数表から手札にする
+pub fn hands_from_card_map(card_map: &[u8]) -> Vec<CardID> {
+    (0..5)
+        .flat_map(|i| iter::repeat(CardID::from_u8(i).unwrap()).take(card_map[i as usize].into()))
+        .collect::<Vec<CardID>>()
 }
 
 fn permutation(n: u64, r: u64) -> u64 {
@@ -104,7 +127,7 @@ pub fn safe_possibility(
     // カード番号がiのやつが墓地に何枚あるかを示す
     rest_cards: &RestCards,
     // 手札(ソート済み)
-    hands: &[u8],
+    hands: &[CardID],
     table: &ProbabilityTable,
     action: Action,
 ) -> Ratio<u64> {
@@ -114,28 +137,38 @@ pub fn safe_possibility(
             if rest_cards[i] <= hands.count_cards(attack.card()) {
                 Ratio::<u64>::one()
             } else {
-                calc_possibility_attack(hands, table, i as u64)
+                calc_possibility_attack(&card_map_from_hands(hands), table, i as u64)
             }
         }
         Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
             let card = movement.card();
-            let i: usize = card.into();
+            let i: usize = card.denote().into();
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
-            let dup = check_twice(distance, card);
+            let dup = check_twice(distance, card.denote());
             if rest_cards[i] <= (hands.count_cards(card) - if dup { 1 } else { 0 }) {
                 Ratio::<u64>::one()
             } else {
-                calc_possibility_move(hands, table, distance - card, dup)
+                calc_possibility_move(
+                    &card_map_from_hands(hands),
+                    table,
+                    distance - card.denote(),
+                    dup,
+                )
             }
         }
         Action::Move(movement) => {
             let card = movement.card();
-            let i: usize = card.into();
+            let i: usize = card.denote().into();
             if rest_cards[i] <= hands.count_cards(card) {
                 Ratio::<u64>::one()
             } else {
-                calc_possibility_move(hands, table, distance + card, false)
+                calc_possibility_move(
+                    &card_map_from_hands(hands),
+                    table,
+                    distance + card.denote(),
+                    false,
+                )
             }
         }
     }
@@ -202,17 +235,17 @@ pub fn win_poss_attack(
     // カード番号がiのやつが墓地に何枚あるかを示す
     rest_cards: &RestCards,
     // 手札(ソート済み)
-    hands: &[u8],
+    hands: &[CardID],
     table: &ProbabilityTable,
     action: Action,
 ) -> Ratio<u64> {
     match action {
         Action::Attack(attack) => {
-            let i: usize = attack.card().into();
+            let i: usize = attack.card().denote().into();
             if rest_cards[i] < hands.count_cards(attack.card()) {
                 return Ratio::<u64>::one();
             } else {
-                return calc_win_possibility(hands, table, i as u64);
+                return calc_win_possibility(&card_map_from_hands(hands), table, i as u64);
             }
         }
         _ => return Ratio::<u64>::zero(),
@@ -261,10 +294,17 @@ pub fn last_move(
     match last {
         true => {
             let can_attack = hands[distance as usize - 1] != 0;
-            let attack_action =
-                Action::Attack(Attack::new(distance as u8, hands[distance as usize]));
+            let attack_action = Action::Attack(Attack::new(
+                CardID::from_u8(distance as u8).unwrap(),
+                hands[distance as usize],
+            ));
             if can_attack {
-                let possibility = win_poss_attack(&restcards, hands, table, attack_action);
+                let possibility = win_poss_attack(
+                    &restcards,
+                    &hands_from_card_map(hands),
+                    table,
+                    attack_action,
+                );
                 if possibility == Ratio::one() {
                     return_value = Some(distance as u64);
                 }

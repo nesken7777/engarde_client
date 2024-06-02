@@ -6,10 +6,12 @@ use std::{
 };
 
 use engarde_client::{
-    algorithm::ProbabilityTable,
+    algorithm::{card_map_from_hands, ProbabilityTable},
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
-    protocol::{BoardInfo, HandInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
+    protocol::{
+        BoardInfo, CardID, HandInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName,
+    },
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
 };
@@ -17,7 +19,7 @@ use rand::{seq::SliceRandom, thread_rng};
 
 struct MyStateAlg {
     id: PlayerID,
-    hands: Vec<u8>,
+    hands: Vec<CardID>,
     cards: RestCards,
     p0_position: u8,
     p1_position: u8,
@@ -26,7 +28,7 @@ struct MyStateAlg {
 impl MyStateAlg {
     fn new(
         id: PlayerID,
-        hands: Vec<u8>,
+        hands: Vec<CardID>,
         cards: RestCards,
         p0_position: u8,
         p1_position: u8,
@@ -45,13 +47,13 @@ impl MyStateAlg {
         self.p1_position = board_info.p1_position();
     }
 
-    fn update_hands(&mut self, hand_info: Vec<u8>) {
+    fn update_hands(&mut self, hand_info: Vec<CardID>) {
         self.hands = hand_info;
         self.hands.sort();
     }
 
     fn actions(&self) -> Vec<Action> {
-        fn attack_cards(hands: &[u8], card: u8) -> Option<Action> {
+        fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             if have > 0 {
                 Some(Action::Attack(Attack::new(card, have as u8)))
@@ -59,7 +61,7 @@ impl MyStateAlg {
                 None
             }
         }
-        fn decide_moves(for_back: bool, for_forward: bool, card: u8) -> Vec<Action> {
+        fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
             use Direction::*;
             match (for_back, for_forward) {
                 (true, true) => vec![
@@ -80,46 +82,37 @@ impl MyStateAlg {
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.p0_position.saturating_sub(card) >= 1,
-                            self.p0_position + card < self.p1_position,
+                            self.p0_position.saturating_sub(card.denote()) >= 1,
+                            self.p0_position + card.denote() < self.p1_position,
                             card,
                         )
                     })
                     .collect::<Vec<Action>>();
-
-                [
-                    moves,
-                    attack_cards(
-                        &self.hands,
-                        self.p1_position.checked_sub(self.p0_position).unwrap(),
-                    )
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-                ]
-                .concat()
+                let attack = (|| {
+                    let n = self.p1_position.checked_sub(self.p0_position)?;
+                    let card = CardID::from_u8(n)?;
+                    attack_cards(&self.hands, card)
+                })();
+                [moves, attack.into_iter().collect::<Vec<_>>()].concat()
             }
             PlayerID::One => {
                 let moves = set
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.p1_position + card <= 23,
-                            self.p1_position.saturating_sub(card) > self.p0_position,
+                            self.p1_position + card.denote() <= 23,
+                            self.p1_position.saturating_sub(card.denote()) > self.p0_position,
                             card,
                         )
                     })
                     .collect::<Vec<Action>>();
 
-                [
-                    moves,
-                    attack_cards(
-                        &self.hands,
-                        self.p1_position.checked_sub(self.p0_position).unwrap(),
-                    )
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-                ]
-                .concat()
+                let attack = (|| {
+                    let n = self.p1_position.checked_sub(self.p0_position)?;
+                    let card = CardID::from_u8(n)?;
+                    attack_cards(&self.hands, card)
+                })();
+                [moves, attack.into_iter().collect::<Vec<_>>()].concat()
             }
         }
     }
@@ -131,22 +124,13 @@ fn act(state: &MyStateAlg) -> Action {
     let acceptable = AcceptableNumbers::new(&card_map, &state.cards, distance);
     let table = ProbabilityTable::new(25 - state.cards.iter().sum::<u8>(), &state.cards);
     let initial = initial_move(&card_map, distance, acceptable).ok();
-    let middle = middle_move(&card_map, distance, &state.cards, &table);
+    let middle = middle_move(&state.hands, distance, &state.cards, &table);
     let det = initial.or(middle);
     det.unwrap_or({
         let mut rng = thread_rng();
         let actions = state.actions();
         actions.choose(&mut rng).copied().unwrap()
     })
-}
-
-/// 手札からカード番号-枚数表にする
-fn card_map_from_hands(hands: &[u8]) -> [u8; 5] {
-    (0..5)
-        .map(|x| hands.iter().filter(|&&y| x == y).count() as u8)
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap()
 }
 
 fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) -> io::Result<()> {
