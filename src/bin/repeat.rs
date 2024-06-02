@@ -1,6 +1,7 @@
 use std::{fmt::Display, process::Command};
 
 use clap::{Parser, ValueEnum};
+use engarde_client::print;
 
 const FINAL_LOOP_COUNT: usize = 20;
 const LOOP_COUNT: usize = 20;
@@ -67,7 +68,7 @@ fn q_learning_loop(final_loop: usize, loop_count: usize, max_score: u32) {
 }
 
 fn dqn_loop(final_loop: usize, loop_count: usize, max_score: u32) {
-    for _ in 0..final_loop * loop_count {
+    for i in 0..final_loop * loop_count {
         let mut server = Command::new(".\\engarde_server.exe")
             .arg(max_score.to_string())
             .spawn()
@@ -86,6 +87,7 @@ fn dqn_loop(final_loop: usize, loop_count: usize, max_score: u32) {
         server.wait().unwrap();
         client0.wait().unwrap();
         client1.wait().unwrap();
+        print(format!("{i}").as_str()).unwrap();
     }
 }
 
