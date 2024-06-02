@@ -73,11 +73,11 @@ impl LearnedValues {
                         match action {
                             Action::Move(movement) => {
                                 let action_bytes =
-                                    vec![0, movement.card, movement.direction.denote()];
+                                    vec![0, movement.card(), movement.direction().denote()];
                                 [action_bytes, value.to_le_bytes().to_vec()].concat()
                             }
                             Action::Attack(attack) => {
-                                let action_bytes = vec![1, attack.card, attack.quantity];
+                                let action_bytes = vec![1, attack.card(), attack.quantity()];
                                 [action_bytes, value.to_le_bytes().to_vec()].concat()
                             }
                         }
@@ -142,15 +142,9 @@ impl LearnedValues {
                             1 => Direction::Back,
                             _ => unreachable!(),
                         };
-                        Action::Move(Movement {
-                            card: card_bytes[0],
-                            direction,
-                        })
+                        Action::Move(Movement::new(card_bytes[0], direction))
                     }
-                    1 => Action::Attack(Attack {
-                        card: card_bytes[0],
-                        quantity: property_bytes[0],
-                    }),
+                    1 => Action::Attack(Attack::new(card_bytes[0], property_bytes[0])),
                     _ => unreachable!(),
                 };
                 let value = f64::from_le_bytes(value_bytes.try_into().unwrap());

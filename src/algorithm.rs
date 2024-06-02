@@ -110,17 +110,15 @@ pub fn safe_possibility(
 ) -> Ratio<u64> {
     match action {
         Action::Attack(attack) => {
-            let i: usize = attack.card.into();
-            if rest_cards[i] <= hands.count_cards(attack.card) {
+            let i: usize = attack.card().into();
+            if rest_cards[i] <= hands.count_cards(attack.card()) {
                 Ratio::<u64>::one()
             } else {
                 calc_possibility_attack(hands, table, i as u64)
             }
         }
-        Action::Move(Movement {
-            card,
-            direction: Direction::Forward,
-        }) => {
+        Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
+            let card = movement.card();
             let i: usize = card.into();
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
@@ -131,10 +129,8 @@ pub fn safe_possibility(
                 calc_possibility_move(hands, table, distance - card, dup)
             }
         }
-        Action::Move(Movement {
-            card,
-            direction: Direction::Back,
-        }) => {
+        Action::Move(movement) => {
+            let card = movement.card();
             let i: usize = card.into();
             if rest_cards[i] <= hands.count_cards(card) {
                 Ratio::<u64>::one()
@@ -212,8 +208,8 @@ pub fn win_poss_attack(
 ) -> Ratio<u64> {
     match action {
         Action::Attack(attack) => {
-            let i: usize = attack.card.into();
-            if rest_cards[i] < hands.count_cards(attack.card) {
+            let i: usize = attack.card().into();
+            if rest_cards[i] < hands.count_cards(attack.card()) {
                 return Ratio::<u64>::one();
             } else {
                 return calc_win_possibility(hands, table, i as u64);
@@ -265,10 +261,8 @@ pub fn last_move(
     match last {
         true => {
             let can_attack = hands[distance as usize - 1] != 0;
-            let attack_action = Action::Attack(Attack {
-                card: distance as u8,
-                quantity: hands[distance as usize],
-            });
+            let attack_action =
+                Action::Attack(Attack::new(distance as u8, hands[distance as usize]));
             if can_attack {
                 let possibility = win_poss_attack(&restcards, hands, table, attack_action);
                 if possibility == Ratio::one() {

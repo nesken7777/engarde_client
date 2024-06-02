@@ -101,14 +101,42 @@ impl Display for Direction {
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Movement {
-    pub card: u8,
-    pub direction: Direction,
+    card: u8,
+    direction: Direction,
+}
+
+impl Movement {
+    pub fn new(card: u8, direction: Direction) -> Self {
+        Self { card, direction }
+    }
+    
+    pub fn card(&self) -> u8 {
+        self.card
+    }
+    
+    pub fn direction(&self) -> Direction {
+        self.direction
+    }
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Attack {
-    pub card: u8,
-    pub quantity: u8,
+    card: u8,
+    quantity: u8,
+}
+
+impl Attack {
+    pub fn new(card: u8, quantity: u8) -> Self {
+        Self { card, quantity }
+    }
+    
+    pub fn card(&self) -> u8 {
+        self.card
+    }
+    
+    pub fn quantity(&self) -> u8 {
+        self.quantity
+    }
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -202,16 +230,16 @@ impl Played {
     pub fn to_action(&self) -> Action {
         match self {
             Played::MoveMent(movement) => Action::Move(Movement {
-                card: movement.play_card,
-                direction: match movement.direction.as_str() {
+                card: movement.play_card(),
+                direction: match movement.direction() {
                     "F" => Direction::Forward,
                     "B" => Direction::Back,
                     _ => unreachable!(),
                 },
             }),
             Played::Attack(attack) => Action::Attack(Attack {
-                card: attack.play_card,
-                quantity: attack.num_of_card,
+                card: attack.play_card(),
+                quantity: attack.num_of_card(),
             }),
         }
     }
@@ -539,7 +567,7 @@ impl Agent<MyState> for MyAgent {
                             // print(
                             //     format!("ラウンド終わり! 勝者:{}", round_end.round_winner).as_str(),
                             // )?;
-                            match round_end.round_winner {
+                            match round_end.round_winner() {
                                 0 => self.state.p0_score += 1,
                                 1 => self.state.p1_score += 1,
                                 _ => {}
@@ -548,7 +576,7 @@ impl Agent<MyState> for MyAgent {
                             break;
                         }
                         GameEnd(game_end) => {
-                            print(format!("ゲーム終わり! 勝者:{}", game_end.winner).as_str())?;
+                            print(format!("ゲーム終わり! 勝者:{}", game_end.winner()).as_str())?;
                             self.state.game_end = true;
                             break;
                         }

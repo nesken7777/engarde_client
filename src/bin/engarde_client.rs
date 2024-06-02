@@ -45,7 +45,7 @@ fn ask_movement(player: &PlayerProperty) -> io::Result<Action> {
             }
         }
     };
-    Ok(Action::Move(Movement { card, direction }))
+    Ok(Action::Move(Movement::new(card, direction)))
 }
 
 enum CantAttack {
@@ -80,17 +80,11 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
             }
         }
     };
-    Ok(Action::Attack(Attack { card, quantity }))
+    Ok(Action::Attack(Attack::new(card, quantity)))
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
-    print(
-        format!(
-            "p0: {}, p1: {}",
-            board.p0_position(), board.p1_position()
-        )
-        .as_str(),
-    )?;
+    print(format!("p0: {}, p1: {}", board.p0_position(), board.p1_position()).as_str())?;
     print(format!("手札:{:?}", player.hand).as_str())?;
     loop {
         print("どっちのアクションにする?")?;
@@ -124,12 +118,12 @@ fn act(
     let action = ask_action(my_info, board_state)?;
     match action {
         Action::Move(movement) => {
-            cards[(movement.card - 1) as usize] -= 1;
+            cards[(movement.card() - 1) as usize] -= 1;
             // send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
-            cards[(attack.card - 1) as usize] =
-                cards[(attack.card - 1) as usize].saturating_sub(attack.quantity * 2);
+            cards[(attack.card() - 1) as usize] =
+                cards[(attack.card() - 1) as usize].saturating_sub(attack.quantity() * 2);
             // send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }

@@ -29,7 +29,7 @@ pub fn get_id(bufreader: &mut BufReader<TcpStream>) -> io::Result<PlayerID> {
     let string = read_stream(bufreader)?;
     let connection_start = serde_json::from_str::<ConnectionStart>(&string)
         .expect("来たものがConnectionStartじゃない");
-    Ok(connection_start.client_id)
+    Ok(connection_start.client_id())
 }
 
 pub fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> io::Result<()>

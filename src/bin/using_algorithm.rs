@@ -54,10 +54,7 @@ impl MyStateAlg {
         fn attack_cards(hands: &[u8], card: u8) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             if have > 0 {
-                Some(Action::Attack(Attack {
-                    card,
-                    quantity: have as u8,
-                }))
+                Some(Action::Attack(Attack::new(card, have as u8)))
             } else {
                 None
             }
@@ -66,23 +63,11 @@ impl MyStateAlg {
             use Direction::*;
             match (for_back, for_forward) {
                 (true, true) => vec![
-                    Action::Move(Movement {
-                        card,
-                        direction: Back,
-                    }),
-                    Action::Move(Movement {
-                        card,
-                        direction: Forward,
-                    }),
+                    Action::Move(Movement::new(card, Back)),
+                    Action::Move(Movement::new(card, Forward)),
                 ],
-                (true, false) => vec![Action::Move(Movement {
-                    card,
-                    direction: Back,
-                })],
-                (false, true) => vec![Action::Move(Movement {
-                    card,
-                    direction: Forward,
-                })],
+                (true, false) => vec![Action::Move(Movement::new(card, Back))],
+                (false, true) => vec![Action::Move(Movement::new(card, Forward))],
                 (false, false) => {
                     vec![]
                 }

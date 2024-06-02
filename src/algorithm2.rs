@@ -100,10 +100,7 @@ pub fn initial_move(
 
     for i in (0..5).rev() {
         if acceptable[i as usize] {
-            return Ok(Action::Move(Movement {
-                card: i,
-                direction: Direction::Forward,
-            }));
+            return Ok(Action::Move(Movement::new(i, Direction::Forward)));
         }
     }
     //todo:平均にする
@@ -111,15 +108,9 @@ pub fn initial_move(
     let average = calc_ave(hands);
     //clippyに従うとエラーになった
     if average < Ratio::from_integer(3) {
-        Ok(Action::Move(Movement {
-            card: 2,
-            direction: Direction::Forward,
-        }))
+        Ok(Action::Move(Movement::new(2, Direction::Forward)))
     } else {
-        Ok(Action::Move(Movement {
-            card: 5,
-            direction: Direction::Forward,
-        }))
+        Ok(Action::Move(Movement::new(5, Direction::Forward)))
     }
 }
 //自分の手札で到達し得る相手との距離のvecを返す。
@@ -143,14 +134,13 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
 //nが指定する距離に行くために行うActionを返す
 pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
     match n.cmp(&distance) {
-        std::cmp::Ordering::Greater => Some(Action::Move(Movement {
-            card: n - distance,
-            direction: Direction::Back,
-        })),
-        std::cmp::Ordering::Less => Some(Action::Move(Movement {
-            card: distance - n,
-            direction: Direction::Forward,
-        })),
+        std::cmp::Ordering::Greater => {
+            Some(Action::Move(Movement::new(n - distance, Direction::Back)))
+        }
+        std::cmp::Ordering::Less => Some(Action::Move(Movement::new(
+            distance - n,
+            Direction::Forward,
+        ))),
         std::cmp::Ordering::Equal => None,
     }
 }
@@ -172,18 +162,18 @@ pub fn should_go_2_7(
     //7の距離に行くべき状態か判断する
 
     if let Some(movement) = movement_togo7 {
-        if hands[movement.card as usize] != 0
-            && movement.direction == Direction::Forward
-            && acceptable[movement.card as usize]
+        if hands[movement.card() as usize] != 0
+            && movement.direction() == Direction::Forward
+            && acceptable[movement.card() as usize]
         {
             return togo7;
         }
     };
     //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[movement.card as usize] != 0
-            && movement.direction == Direction::Forward
-            && acceptable[movement.card as usize]
+        if hands[movement.card() as usize] != 0
+            && movement.direction() == Direction::Forward
+            && acceptable[movement.card() as usize]
         {
             return togo2;
         }
@@ -199,10 +189,10 @@ pub fn middle_move(
     table: &ProbabilityTable,
 ) -> Option<Action> {
     let att_action = if distance <= 5 {
-        Some(Action::Attack(Attack {
-            card: distance,
-            quantity: hands[(distance - 1) as usize],
-        }))
+        Some(Action::Attack(Attack::new(
+            distance,
+            hands[(distance - 1) as usize],
+        )))
     } else {
         None
     };
