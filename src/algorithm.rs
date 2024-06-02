@@ -41,7 +41,7 @@ impl ProbabilityTable {
     }
 
     fn access(&self, card: CardID, quantity: Maisuu) -> Ratio<u64> {
-        use CardID::*;
+        use CardID::{Five, Four, One, Three, Two};
         let idx: usize = quantity.denote().into();
         match card {
             One => self.card1[idx],
@@ -86,7 +86,7 @@ fn combination(n: u64, r: u64) -> u64 {
     perm / (1..=r).product::<u64>()
 }
 
-/// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にi枚ある確率のリスト(添え字i)
+/// `total_unvisible_cards`枚(山札+相手の手札)の中に`target_unvisible_cards`枚残っているカードが相手の手札(5枚)の中に`i`枚ある確率のリスト(添え字`i`)
 fn probability(target_unvisible_cards: Maisuu, total_unvisible_cards: u8) -> [Ratio<u64>; 6] {
     let target_unvisible_cards: u64 = target_unvisible_cards.denote().into();
     let total_unvisible_cards: u64 = total_unvisible_cards.into();
@@ -298,14 +298,14 @@ pub fn last_move(
     let mut last: bool = false;
     //次に自分が行う行動が最後か否か判定。trueなら最後falseなら最後ではない
     fn check_last(parried_quant: u8, restcards: &RestCards) -> bool {
-        restcards.iter().map(|cards| cards.denote()).sum::<u8>() <= 1 + parried_quant
+        restcards.iter().map(Maisuu::denote).sum::<u8>() <= 1 + parried_quant
     }
     //自分が行動することで届く距離を求める。
     fn reachable(distance: u64, hands: &[u8]) -> Vec<u8> {
         let mut reachable_vec = Vec::new();
         for i in hands {
             reachable_vec.push(distance as u8 + *i);
-            if distance as i64 - *i as i64 >= 0 {
+            if distance as i64 - i64::from(*i) >= 0 {
                 reachable_vec.push(distance as u8 - *i);
             }
         }

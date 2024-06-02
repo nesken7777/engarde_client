@@ -22,6 +22,12 @@ pub struct RestCards {
     cards: [Maisuu; CardID::MAX],
 }
 
+impl Default for RestCards {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RestCards {
     pub fn new() -> Self {
         Self {
@@ -192,7 +198,7 @@ impl Action {
 
 impl From<Action> for [f32; 35] {
     fn from(value: Action) -> Self {
-        let mut arr = [0f32; 35];
+        let mut arr = [0_f32; 35];
         arr[value.as_index()] = 1.0;
         arr
     }
@@ -334,7 +340,8 @@ impl MyState {
 impl State for MyState {
     type A = Action;
     fn reward(&self) -> f64 {
-        (self.my_score() as f64 * 200.0).powi(2) - (self.enemy_score() as f64 * 200.0).powi(2)
+        (f64::from(self.my_score()) * 200.0).powi(2)
+            - (f64::from(self.enemy_score()) * 200.0).powi(2)
     }
     fn actions(&self) -> Vec<Action> {
         if self.game_end {
@@ -352,7 +359,7 @@ impl State for MyState {
             }
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
-            use Direction::*;
+            use Direction::{Back, Forward};
             match (for_back, for_forward) {
                 (true, true) => vec![
                     Action::Move(Movement {
@@ -377,7 +384,7 @@ impl State for MyState {
                 }
             }
         }
-        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().cloned());
+        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().copied());
         match self.my_id {
             PlayerID::Zero => {
                 let moves = set
@@ -430,23 +437,23 @@ impl State for MyState {
 // }
 impl From<MyState> for [f32; 16] {
     fn from(value: MyState) -> Self {
-        let id = vec![value.my_id.denote() as f32];
+        let id = vec![f32::from(value.my_id.denote())];
         let mut hands = value
             .hands
             .into_iter()
-            .map(|x| x.denote() as f32)
+            .map(|x| f32::from(x.denote()))
             .collect::<Vec<f32>>();
         hands.resize(5, 0.0);
         let cards = value
             .cards
             .iter()
-            .map(|&x| x.denote() as f32)
+            .map(|&x| f32::from(x.denote()))
             .collect::<Vec<f32>>();
         let p0_score = vec![value.p0_score as f32];
         let p1_score = vec![value.p1_score as f32];
-        let my_position = vec![value.p0_position as f32];
-        let enemy_position = vec![value.p1_position as f32];
-        let game_end = vec![value.game_end as u8 as f32];
+        let my_position = vec![f32::from(value.p0_position)];
+        let enemy_position = vec![f32::from(value.p1_position)];
+        let game_end = vec![f32::from(u8::from(value.game_end))];
         [
             id,
             hands,
@@ -507,7 +514,9 @@ impl Agent<MyState> for MyAgent {
                 Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)),
             }
         }
-        use Messages::*;
+        use Messages::{
+            Accept, BoardInfo, DoPlay, GameEnd, HandInfo, Played, RoundEnd, ServerError,
+        };
         //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> io::Result<()> {
             loop {
@@ -518,7 +527,7 @@ impl Agent<MyState> for MyAgent {
                                 (board_info.p0_position(), board_info.p1_position());
                         }
                         HandInfo(hand_info) => {
-                            let mut hand_vec = hand_info.to_vec();
+                            let hand_vec = hand_info.to_vec();
                             self.state.hands = hand_vec;
                             break;
                         }
@@ -529,7 +538,7 @@ impl Agent<MyState> for MyAgent {
                         }
                         ServerError(e) => {
                             print("エラーもらった")?;
-                            print(format!("{:?}", e).as_str())?;
+                            print(format!("{e:?}").as_str())?;
                             break;
                         }
                         Played(played) => {
@@ -555,7 +564,7 @@ impl Agent<MyState> for MyAgent {
                         }
                     },
                     Err(e) => {
-                        panic!("JSON解析できなかった {}", e);
+                        panic!("JSON解析できなかった {e}");
                     }
                 }
             }

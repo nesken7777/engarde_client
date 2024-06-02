@@ -165,14 +165,14 @@ pub fn should_go_2_7(
     hands: &[Maisuu; 5],
     distance: u8,
     rest: &RestCards,
-    table: &ProbabilityTable,
+    _table: &ProbabilityTable,
 ) -> Option<Action> {
     let acceptable = AcceptableNumbers::new(hands, rest, distance);
 
     let togo7 = action_togo(7, distance);
     let togo2 = action_togo(2, distance);
-    let movement_togo7 = togo7.and_then(|act| act.get_movement());
-    let movement_togo2 = togo2.and_then(|act| act.get_movement());
+    let movement_togo7 = togo7.and_then(Action::get_movement);
+    let movement_togo2 = togo2.and_then(Action::get_movement);
 
     //7の距離に行くべき状態か判断する
 

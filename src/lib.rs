@@ -114,9 +114,11 @@ impl Maisuu {
     /// `Maisuu::MAX`を超える場合、`Maisuu::MAX`になります。
     pub fn saturating_add(&self, other: Maisuu) -> Maisuu {
         let n = self.0 + other.0;
-        (n <= 5)
-            .then_some(Maisuu::new_unchecked(n))
-            .unwrap_or(Maisuu::MAX)
+        if n <= 5 {
+            Maisuu::new_unchecked(n)
+        } else {
+            Maisuu::MAX
+        }
     }
 
     /// カードを減算します。0以下は全て0となります。
@@ -129,9 +131,11 @@ impl Maisuu {
     /// `Maisuu::MAX`を超えた場合、`Maisuu::MAX`になります。
     pub fn saturating_mul(&self, n: u8) -> Maisuu {
         let n = self.0.saturating_mul(n);
-        (n <= 5)
-            .then_some(Maisuu::new_unchecked(n))
-            .unwrap_or(Maisuu::MAX)
+        if n <= 5 {
+            Maisuu::new_unchecked(n)
+        } else {
+            Maisuu::MAX
+        }
     }
 }
 

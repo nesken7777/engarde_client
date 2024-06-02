@@ -8,14 +8,14 @@ pub enum Errors {
     Other(&'static str),
 }
 
-use Errors::*;
+use Errors::{Other, ParseMessage, Serde};
 
 impl Display for Errors {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseMessage(e) => write!(f, "{}", e),
-            Serde(e) => write!(f, "{}", e),
-            Other(e) => write!(f, "{}", e),
+            ParseMessage(e) => write!(f, "{e}"),
+            Serde(e) => write!(f, "{e}"),
+            Other(e) => write!(f, "{e}"),
         }
     }
 }

@@ -603,6 +603,12 @@ pub struct Evaluation {
     eval_5b: Option<String>,
 }
 
+impl Default for Evaluation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Evaluation {
     pub fn new() -> Self {
         Self {
