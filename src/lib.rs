@@ -16,7 +16,7 @@ pub mod states;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CardID {
     /// 番号1
-    One,
+    One = 1,
     /// 番号2
     Two,
     /// 番号3
@@ -136,10 +136,10 @@ impl Maisuu {
 }
 
 /// 自分と相手は通常5枚を手持ちに入れているはずです。
-pub const HANDS_DEFAULT_U8:u8 = 5;
+pub const HANDS_DEFAULT_U8: u8 = 5;
 
 /// `HANDS_DEFAULT_U8`の`u64`版です。
-pub const HANDS_DEFAULT_U64:u64 = 5;
+pub const HANDS_DEFAULT_U64: u64 = 5;
 
 pub fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();
