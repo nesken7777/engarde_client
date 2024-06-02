@@ -18,7 +18,7 @@ use rurel::{
 
 use engarde_client::{
     get_id,
-    protocol::{BoardInfo, Messages, PlayerID, PlayerName},
+    protocol::{Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
     CardID, Maisuu,

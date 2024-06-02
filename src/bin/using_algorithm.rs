@@ -9,7 +9,7 @@ use engarde_client::{
     algorithm::{card_map_from_hands, ProbabilityTable},
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
-    protocol::{BoardInfo, HandInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
+    protocol::{BoardInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
     CardID, Maisuu,
