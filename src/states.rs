@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     print,
-    protocol::{Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
+    protocol::{CardID, Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
     read_stream, send_info,
 };
 
@@ -20,19 +20,18 @@ pub const HANDS_DEFAULT_U8: u8 = 5;
 pub const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
 pub const MAX_MAISUU_OF_ID_U8: u8 = 5;
 pub const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
-pub const MAX_ID: usize = 5;
 pub const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
 
 //残りのカード枚数(種類ごと)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub struct RestCards {
-    cards: [u8; MAX_ID],
+    cards: [u8; CardID::MAX],
 }
 
 impl RestCards {
     pub fn new() -> Self {
         Self {
-            cards: [MAX_MAISUU_OF_ID_U8; MAX_ID],
+            cards: [MAX_MAISUU_OF_ID_U8; CardID::MAX],
         }
     }
     pub fn from_slice(slice: &[u8]) -> RestCards {

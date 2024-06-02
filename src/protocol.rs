@@ -97,6 +97,9 @@ pub enum CardID {
 }
 
 impl CardID {
+    /// カード番号の最大値です
+    pub const MAX: usize = 5;
+
     /// `u8`上の表現を返します
     pub fn denote(&self) -> u8 {
         use CardID::{Five, Four, One, Three, Two};
