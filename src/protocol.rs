@@ -82,7 +82,7 @@ impl<'de> Deserialize<'de> for PlayerID {
 }
 
 /// カード番号を示す。
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CardID {
     /// 番号1
     One,
@@ -630,7 +630,7 @@ impl PlayMovement {
             from: "Client",
             to: "Server",
             message_id: "101",
-            play_card: info.card().to_string(),
+            play_card: info.card().denote().to_string(),
             direction: info.direction().to_string(),
         }
     }
@@ -659,7 +659,7 @@ impl PlayAttack {
             from: "Client",
             to: "Server",
             message_id: "102",
-            play_card: info.card().to_string(),
+            play_card: info.card().denote().to_string(),
             num_of_card: info.quantity().to_string(),
         }
     }

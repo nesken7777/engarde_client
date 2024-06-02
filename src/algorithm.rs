@@ -1,10 +1,10 @@
 use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
-use crate::states::{
+use crate::{protocol::CardID, states::{
     Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
     MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
-};
+}};
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
@@ -84,11 +84,11 @@ fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<
 }
 
 trait HandsUtil {
-    fn count_cards(&self, card_id: u8) -> u8;
+    fn count_cards(&self, card_id: CardID) -> u8;
 }
 
-impl HandsUtil for &[u8] {
-    fn count_cards(&self, card_id: u8) -> u8 {
+impl HandsUtil for &[CardID] {
+    fn count_cards(&self, card_id: CardID) -> u8 {
         self.iter()
             .filter(|&&i| i == card_id)
             .count()
@@ -110,7 +110,7 @@ pub fn safe_possibility(
 ) -> Ratio<u64> {
     match action {
         Action::Attack(attack) => {
-            let i: usize = attack.card().into();
+            let i: usize = attack.card().denote().into();
             if rest_cards[i] <= hands.count_cards(attack.card()) {
                 Ratio::<u64>::one()
             } else {

@@ -64,11 +64,11 @@ impl Deref for RestCards {
 pub fn used_card(cards: &mut RestCards, action: Action) {
     match action {
         Action::Move(movement) => {
-            let i: usize = movement.card.into();
+            let i: usize = movement.card.denote().into();
             cards[i - 1] -= 1;
         }
         Action::Attack(attack) => {
-            let i: usize = attack.card.into();
+            let i: usize = attack.card.denote().into();
             cards[i - 1] = cards[i - 1].saturating_sub(attack.quantity * 2);
         }
     }
@@ -98,47 +98,47 @@ impl Display for Direction {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Movement {
-    card: u8,
+    card: CardID,
     direction: Direction,
 }
 
 impl Movement {
-    pub fn new(card: u8, direction: Direction) -> Self {
+    pub fn new(card: CardID, direction: Direction) -> Self {
         Self { card, direction }
     }
-    
-    pub fn card(&self) -> u8 {
+
+    pub fn card(&self) -> CardID {
         self.card
     }
-    
+
     pub fn direction(&self) -> Direction {
         self.direction
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Attack {
-    card: u8,
+    card: CardID,
     quantity: u8,
 }
 
 impl Attack {
-    pub fn new(card: u8, quantity: u8) -> Self {
+    pub fn new(card: CardID, quantity: u8) -> Self {
         Self { card, quantity }
     }
-    
-    pub fn card(&self) -> u8 {
+
+    pub fn card(&self) -> CardID {
         self.card
     }
-    
+
     pub fn quantity(&self) -> u8 {
         self.quantity
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum Action {
     Move(Movement),
     Attack(Attack),
@@ -163,17 +163,17 @@ impl Action {
     pub fn from_index(idx: usize) -> Action {
         match idx {
             x @ 0..=4 => Action::Move(Movement {
-                card: (x + 1) as u8,
+                card: CardID::from_u8((x + 1) as u8).unwrap(),
                 direction: Direction::Forward,
             }),
             x @ 5..=9 => Action::Move(Movement {
-                card: (x - 5 + 1) as u8,
+                card: CardID::from_u8((x - 5 + 1) as u8).unwrap(),
                 direction: Direction::Back,
             }),
             x @ 10..=34 => {
                 let x = x - 10;
                 Action::Attack(Attack {
-                    card: (x / 5 + 1) as u8,
+                    card: CardID::from_u8((x / 5 + 1) as u8).unwrap(),
                     quantity: (x % 5 + 1) as u8,
                 })
             }
@@ -206,17 +206,17 @@ impl From<[f32; 35]> for Action {
             .unwrap()
         {
             x @ 0..=4 => Action::Move(Movement {
-                card: (x + 1) as u8,
+                card: CardID::from_u8((x + 1) as u8).unwrap(),
                 direction: Direction::Forward,
             }),
             x @ 5..=9 => Action::Move(Movement {
-                card: (x - 5 + 1) as u8,
+                card: CardID::from_u8((x - 5 + 1) as u8).unwrap(),
                 direction: Direction::Back,
             }),
             x @ 10..=34 => {
                 let x = x - 10;
                 Action::Attack(Attack {
-                    card: (x / 5 + 1) as u8,
+                    card: CardID::from_u8((x / 5 + 1) as u8).unwrap(),
                     quantity: (x % 5 + 1) as u8,
                 })
             }
@@ -229,7 +229,7 @@ impl Played {
     pub fn to_action(&self) -> Action {
         match self {
             Played::MoveMent(movement) => Action::Move(Movement {
-                card: movement.play_card(),
+                card: CardID::from_u8(movement.play_card()).unwrap(),
                 direction: match movement.direction() {
                     "F" => Direction::Forward,
                     "B" => Direction::Back,
@@ -237,7 +237,7 @@ impl Played {
                 },
             }),
             Played::Attack(attack) => Action::Attack(Attack {
-                card: attack.play_card(),
+                card: CardID::from_u8(attack.play_card()).unwrap(),
                 quantity: attack.num_of_card(),
             }),
         }
@@ -245,10 +245,10 @@ impl Played {
 }
 
 // Stateは、結果状態だけからその評価と次できる行動のリストを与える。
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct MyState {
     my_id: PlayerID,
-    hands: Vec<u8>,
+    hands: Vec<CardID>,
     cards: RestCards,
     p0_score: u32,
     p1_score: u32,
@@ -258,7 +258,7 @@ pub struct MyState {
 }
 
 impl MyState {
-    pub fn hands(&self) -> &[u8] {
+    pub fn hands(&self) -> &[CardID] {
         &self.hands
     }
 
@@ -294,7 +294,7 @@ impl MyState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         my_id: PlayerID,
-        hands: Vec<u8>,
+        hands: Vec<CardID>,
         cards: RestCards,
         p0_score: u32,
         p1_score: u32,
@@ -359,7 +359,7 @@ impl State for MyState {
         if self.game_end {
             return Vec::new();
         }
-        fn attack_cards(hands: &[u8], card: u8) -> Option<Action> {
+        fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             if have > 0 {
                 Some(Action::Attack(Attack {
@@ -370,7 +370,7 @@ impl State for MyState {
                 None
             }
         }
-        fn decide_moves(for_back: bool, for_forward: bool, card: u8) -> Vec<Action> {
+        fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
             use Direction::*;
             match (for_back, for_forward) {
                 (true, true) => vec![
@@ -403,46 +403,36 @@ impl State for MyState {
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.p0_position.saturating_sub(card) >= 1,
-                            self.p0_position + card < self.p1_position,
+                            self.p0_position.saturating_sub(card.denote()) >= 1,
+                            self.p0_position + card.denote() < self.p1_position,
                             card,
                         )
                     })
                     .collect::<Vec<Action>>();
-
-                [
-                    moves,
-                    attack_cards(
-                        &self.hands,
-                        self.p1_position.checked_sub(self.p0_position).unwrap(),
-                    )
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-                ]
-                .concat()
+                let attack = (|| {
+                    let n = self.p1_position.checked_sub(self.p0_position)?;
+                    let card = CardID::from_u8(n)?;
+                    attack_cards(&self.hands, card)
+                })();
+                [moves, attack.into_iter().collect::<Vec<_>>()].concat()
             }
             PlayerID::One => {
                 let moves = set
                     .into_iter()
                     .flat_map(|card| {
                         decide_moves(
-                            self.p1_position + card <= 23,
-                            self.p1_position.saturating_sub(card) > self.p0_position,
+                            self.p1_position + card.denote() <= 23,
+                            self.p1_position.saturating_sub(card.denote()) > self.p0_position,
                             card,
                         )
                     })
                     .collect::<Vec<Action>>();
-
-                [
-                    moves,
-                    attack_cards(
-                        &self.hands,
-                        self.p1_position.checked_sub(self.p0_position).unwrap(),
-                    )
-                    .into_iter()
-                    .collect::<Vec<_>>(),
-                ]
-                .concat()
+                let attack = (|| {
+                    let n = self.p1_position.checked_sub(self.p0_position)?;
+                    let card = CardID::from_u8(n)?;
+                    attack_cards(&self.hands, card)
+                })();
+                [moves, attack.into_iter().collect::<Vec<_>>()].concat()
             }
         }
     }
@@ -463,7 +453,7 @@ impl From<MyState> for [f32; 16] {
         let mut hands = value
             .hands
             .into_iter()
-            .map(|x| x as f32)
+            .map(|x| x.denote() as f32)
             .collect::<Vec<f32>>();
         hands.resize(5, 0.0);
         let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
@@ -498,7 +488,7 @@ pub struct MyAgent {
 impl MyAgent {
     pub fn new(
         id: PlayerID,
-        hands: Vec<u8>,
+        hands: Vec<CardID>,
         position_0: u8,
         position_1: u8,
         reader: BufReader<TcpStream>,
@@ -545,7 +535,10 @@ impl Agent<MyState> for MyAgent {
                         HandInfo(hand_info) => {
                             let mut hand_vec = hand_info.to_vec();
                             hand_vec.sort();
-                            self.state.hands = hand_vec;
+                            self.state.hands = hand_vec
+                                .into_iter()
+                                .map(|x| CardID::from_u8(x).unwrap())
+                                .collect();
                             break;
                         }
                         Accept(_) => {}
