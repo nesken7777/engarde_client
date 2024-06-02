@@ -163,8 +163,6 @@ pub struct BoardInfo {
     current_player: Option<PlayerID>,
 }
 
-
-
 impl BoardInfo {
     pub fn new() -> Self {
         BoardInfo {
@@ -209,23 +207,23 @@ pub struct HandInfo {
     #[serde(rename = "To")]
     to: String,
     #[serde(rename = "Hand1", deserialize_with = "deserialize_number_from_string")]
-    pub hand1: u8,
+    hand1: u8,
     #[serde(rename = "Hand2", deserialize_with = "deserialize_number_from_string")]
-    pub hand2: u8,
+    hand2: u8,
     #[serde(rename = "Hand3", deserialize_with = "deserialize_number_from_string")]
-    pub hand3: u8,
+    hand3: u8,
     #[serde(
         rename = "Hand4",
         default,
         deserialize_with = "deserialize_option_number_from_string"
     )]
-    pub hand4: Option<u8>,
+    hand4: Option<u8>,
     #[serde(
         rename = "Hand5",
         default,
         deserialize_with = "deserialize_option_number_from_string"
     )]
-    pub hand5: Option<u8>,
+    hand5: Option<u8>,
 }
 
 impl HandInfo {

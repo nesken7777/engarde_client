@@ -45,17 +45,8 @@ impl MyStateAlg {
         self.p1_position = board_info.p1_position();
     }
 
-    fn update_hands(&mut self, hand_info: HandInfo) {
-        self.hands = [
-            Some(hand_info.hand1),
-            Some(hand_info.hand2),
-            Some(hand_info.hand3),
-            hand_info.hand4,
-            hand_info.hand5,
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
+    fn update_hands(&mut self, hand_info: Vec<u8>) {
+        self.hands = hand_info;
         self.hands.sort();
     }
 
@@ -201,7 +192,7 @@ fn main() -> io::Result<()> {
                         state.update_board(board_info);
                     }
                     Messages::HandInfo(hand_info) => {
-                        state.update_hands(hand_info);
+                        state.update_hands(hand_info.to_vec());
                     }
                     Messages::Accept(_) => (),
                     Messages::DoPlay(_) => {
