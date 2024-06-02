@@ -82,7 +82,7 @@ impl<'de> Deserialize<'de> for PlayerID {
 }
 
 /// カード番号を示す。
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CardID {
     /// 番号1
     One,
@@ -267,13 +267,18 @@ pub struct HandInfo {
 }
 
 impl HandInfo {
-    pub fn to_vec(&self) -> Vec<u8> {
-        match (self.hand4, self.hand5) {
-            (Some(hand4), Some(hand5)) => vec![self.hand1, self.hand2, self.hand3, hand4, hand5],
-            (Some(hand4), None) => vec![self.hand1, self.hand2, self.hand3, hand4],
-            (None, Some(hand5)) => vec![self.hand1, self.hand2, self.hand3, hand5],
-            (None, None) => vec![self.hand1, self.hand2, self.hand3],
-        }
+    pub fn to_vec(&self) -> Vec<CardID> {
+        let hand1 = CardID::from_u8(self.hand1);
+        let hand2 = CardID::from_u8(self.hand2);
+        let hand3 = CardID::from_u8(self.hand3);
+        let hand4 = (|| CardID::from_u8(self.hand4?))();
+        let hand5 = (|| CardID::from_u8(self.hand5?))();
+        let mut hands = vec![hand1, hand2, hand3, hand4, hand5]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<CardID>>();
+        hands.sort();
+        hands
     }
 }
 

@@ -1,6 +1,6 @@
 use engarde_client::{
     get_id, print,
-    protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},
+    protocol::{BoardInfo, CardID, Evaluation, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
 };
@@ -16,11 +16,15 @@ fn read_keyboard() -> io::Result<String> {
     Ok(response)
 }
 
-fn ask_card(player: &PlayerProperty) -> io::Result<u8> {
+fn ask_card(player: &PlayerProperty) -> io::Result<CardID> {
     loop {
         print("カードはどれにする?")?;
         let Ok(card) = read_keyboard()?.parse::<u8>() else {
             print("それ数字じゃないだろ")?;
+            continue;
+        };
+        let Some(card) = CardID::from_u8(card) else {
+            print("カード番号の範囲外だ")?;
             continue;
         };
         if !player.hand.contains(&card) {
@@ -61,7 +65,7 @@ impl From<io::Error> for CantAttack {
 
 fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, CantAttack> {
     use CantAttack::*;
-    let card = board.distance_between_enemy();
+    let card = CardID::from_u8(board.distance_between_enemy()).ok_or(Lack)?;
     let have = player.hand.iter().filter(|&&x| x == card).count() as u8;
     if have == 0 {
         return Err(Lack);
@@ -118,12 +122,12 @@ fn act(
     let action = ask_action(my_info, board_state)?;
     match action {
         Action::Move(movement) => {
-            cards[(movement.card() - 1) as usize] -= 1;
+            cards[(movement.card().denote() - 1) as usize] -= 1;
             // send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
-            cards[(attack.card() - 1) as usize] =
-                cards[(attack.card() - 1) as usize].saturating_sub(attack.quantity() * 2);
+            cards[(attack.card().denote() - 1) as usize] =
+                cards[(attack.card().denote() - 1) as usize].saturating_sub(attack.quantity() * 2);
             // send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }
@@ -132,7 +136,7 @@ fn act(
 
 struct PlayerProperty {
     pub id: PlayerID,
-    pub hand: Vec<u8>,
+    pub hand: Vec<CardID>,
     pub position: u8,
 }
 

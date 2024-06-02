@@ -18,10 +18,12 @@ use rurel::{
 
 use engarde_client::{
     get_id,
-    protocol::{BoardInfo, Messages, PlayerID, PlayerName},
+    protocol::{BoardInfo, CardID, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
 };
+
+const DESERIALIZE_ERROR_MESSAGE: &str = "デシリアライズ失敗:数がCardIDの範囲外";
 
 struct BestExploration(AgentTrainer<MyState>);
 
@@ -53,7 +55,12 @@ impl LearnedValues {
             .0
             .iter()
             .flat_map(|(state, action_reward)| -> Vec<u8> {
-                let mut hands = state.hands().to_vec();
+                let mut hands = state
+                    .hands()
+                    .to_vec()
+                    .into_iter()
+                    .map(|x| x.denote())
+                    .collect::<Vec<u8>>();
                 hands.resize(5, 0);
                 let state_bytes = [
                     vec![state.my_id().denote()],
@@ -72,12 +79,16 @@ impl LearnedValues {
                     .flat_map(|(action, value)| -> Vec<u8> {
                         match action {
                             Action::Move(movement) => {
-                                let action_bytes =
-                                    vec![0, movement.card(), movement.direction().denote()];
+                                let action_bytes = vec![
+                                    0,
+                                    movement.card().denote(),
+                                    movement.direction().denote(),
+                                ];
                                 [action_bytes, value.to_le_bytes().to_vec()].concat()
                             }
                             Action::Attack(attack) => {
-                                let action_bytes = vec![1, attack.card(), attack.quantity()];
+                                let action_bytes =
+                                    vec![1, attack.card().denote(), attack.quantity()];
                                 [action_bytes, value.to_le_bytes().to_vec()].concat()
                             }
                         }
@@ -110,9 +121,10 @@ impl LearnedValues {
                 PlayerID::from_u8(my_id_bytes[0]).unwrap(),
                 hands_bytes
                     .iter()
-                    .filter(|&&x| x != 0)
+                    .filter(|&&n| n != 0)
                     .copied()
-                    .collect::<Vec<u8>>(),
+                    .map(|n| CardID::from_u8(n).expect(DESERIALIZE_ERROR_MESSAGE))
+                    .collect::<Vec<CardID>>(),
                 RestCards::from_slice(cards_bytes),
                 u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
                 u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
@@ -142,9 +154,15 @@ impl LearnedValues {
                             1 => Direction::Back,
                             _ => unreachable!(),
                         };
-                        Action::Move(Movement::new(card_bytes[0], direction))
+                        Action::Move(Movement::new(
+                            CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE),
+                            direction,
+                        ))
                     }
-                    1 => Action::Attack(Attack::new(card_bytes[0], property_bytes[0])),
+                    1 => Action::Attack(Attack::new(
+                        CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE),
+                        property_bytes[0],
+                    )),
                     _ => unreachable!(),
                 };
                 let value = f64::from_le_bytes(value_bytes.try_into().unwrap());
@@ -219,7 +237,6 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
             }
         };
         let mut hand_vec = hand_info.to_vec();
-        hand_vec.sort();
         // AI用エージェント作成
         let mut agent = MyAgent::new(
             id,
@@ -303,7 +320,6 @@ fn q_eval(id: u8) -> io::Result<()> {
     };
 
     let mut hand_vec = hand_info.to_vec();
-    hand_vec.sort();
     // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,

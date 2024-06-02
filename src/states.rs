@@ -534,11 +534,7 @@ impl Agent<MyState> for MyAgent {
                         }
                         HandInfo(hand_info) => {
                             let mut hand_vec = hand_info.to_vec();
-                            hand_vec.sort();
-                            self.state.hands = hand_vec
-                                .into_iter()
-                                .map(|x| CardID::from_u8(x).unwrap())
-                                .collect();
+                            self.state.hands = hand_vec;
                             break;
                         }
                         Accept(_) => {}
