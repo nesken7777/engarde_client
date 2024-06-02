@@ -87,6 +87,14 @@ impl Direction {
             Self::Back => 1,
         }
     }
+
+    pub fn from_str(s: &str) -> Option<Direction> {
+        match s {
+            "F" => Some(Self::Forward),
+            "B" => Some(Self::Back),
+            _ => None,
+        }
+    }
 }
 
 impl Display for Direction {
@@ -198,30 +206,13 @@ impl From<Action> for [f32; 35] {
 
 impl From<[f32; 35]> for Action {
     fn from(value: [f32; 35]) -> Self {
-        match value
+        let idx = value
             .into_iter()
             .enumerate()
             .max_by(|&(_, x), &(_, y)| x.total_cmp(&y))
             .map(|(i, _)| i)
-            .unwrap()
-        {
-            x @ 0..=4 => Action::Move(Movement {
-                card: CardID::from_u8((x + 1) as u8).unwrap(),
-                direction: Direction::Forward,
-            }),
-            x @ 5..=9 => Action::Move(Movement {
-                card: CardID::from_u8((x - 5 + 1) as u8).unwrap(),
-                direction: Direction::Back,
-            }),
-            x @ 10..=34 => {
-                let x = x - 10;
-                Action::Attack(Attack {
-                    card: CardID::from_u8((x / 5 + 1) as u8).unwrap(),
-                    quantity: (x % 5 + 1) as u8,
-                })
-            }
-            _ => unreachable!(),
-        }
+            .unwrap();
+        Action::from_index(idx)
     }
 }
 
@@ -229,15 +220,11 @@ impl Played {
     pub fn to_action(&self) -> Action {
         match self {
             Played::MoveMent(movement) => Action::Move(Movement {
-                card: CardID::from_u8(movement.play_card()).unwrap(),
-                direction: match movement.direction() {
-                    "F" => Direction::Forward,
-                    "B" => Direction::Back,
-                    _ => unreachable!(),
-                },
+                card: movement.play_card(),
+                direction: movement.direction() ,
             }),
             Played::Attack(attack) => Action::Attack(Attack {
-                card: CardID::from_u8(attack.play_card()).unwrap(),
+                card: attack.play_card(),
                 quantity: attack.num_of_card(),
             }),
         }

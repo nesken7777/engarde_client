@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
-use crate::states::{Attack, Movement};
+use crate::states::{Attack, Direction, Movement};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
@@ -312,7 +312,7 @@ pub struct Accept {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct PlayedMoveMent {
+struct PlayedMoveMentJson {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
@@ -330,18 +330,41 @@ pub struct PlayedMoveMent {
     direction: String,
 }
 
-impl PlayedMoveMent {
-    pub fn play_card(&self) -> u8 {
+impl PlayedMoveMentJson {
+    fn play_card(&self) -> u8 {
         self.play_card
     }
 
-    pub fn direction(&self) -> &str {
+    fn direction(&self) -> &str {
         &self.direction
     }
 }
 
+#[derive(Debug)]
+pub struct PlayedMoveMent {
+    play_card: CardID,
+    direction: Direction,
+}
+
+impl PlayedMoveMent {
+    fn from_deserialized(json: PlayedMoveMentJson) -> Self {
+        Self {
+            play_card: CardID::from_u8(json.play_card()).unwrap(),
+            direction: Direction::from_str(json.direction()).unwrap(),
+        }
+    }
+
+    pub fn play_card(&self) -> CardID {
+        self.play_card
+    }
+
+    pub fn direction(&self) -> Direction {
+        self.direction
+    }
+}
+
 #[derive(Deserialize, Debug)]
-pub struct PlayedAttack {
+struct PlayedAttackJson {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
@@ -362,8 +385,31 @@ pub struct PlayedAttack {
     num_of_card: u8,
 }
 
-impl PlayedAttack {
+impl PlayedAttackJson {
     pub fn play_card(&self) -> u8 {
+        self.play_card
+    }
+
+    pub fn num_of_card(&self) -> u8 {
+        self.num_of_card
+    }
+}
+
+#[derive(Debug)]
+pub struct PlayedAttack {
+    play_card: CardID,
+    num_of_card: u8,
+}
+
+impl PlayedAttack {
+    fn from_deserialized(json: PlayedAttackJson) -> Self {
+        Self {
+            play_card: CardID::from_u8(json.play_card()).unwrap(),
+            num_of_card: json.num_of_card(),
+        }
+    }
+
+    pub fn play_card(&self) -> CardID {
         self.play_card
     }
 
@@ -495,17 +541,29 @@ impl Messages {
                     .as_str()
                     .ok_or("MessageIDが文字列ではない")?;
                 match message_id {
-                    "101" => Ok(Self::Played(Played::MoveMent(serde_json::from_value(obj)?))),
-                    "102" => Ok(Self::Played(Played::Attack(serde_json::from_value(obj)?))),
+                    "101" => {
+                        let played_movement_info = serde_json::from_value(obj)?;
+                        Ok(Self::Played(Played::MoveMent(
+                            PlayedMoveMent::from_deserialized(played_movement_info),
+                        )))
+                    }
+                    "102" => {
+                        let played_attack_info = serde_json::from_value(obj)?;
+                        Ok(Self::Played(Played::Attack(
+                            PlayedAttack::from_deserialized(played_attack_info),
+                        )))
+                    }
                     _ => Err(ParseMessageError {
                         invalid_info: json.to_string(),
-                    })?,
+                    }
+                    .into()),
                 }
             }
             "Error" => Ok(Self::ServerError(serde_json::from_value(obj)?)),
             _ => Err(ParseMessageError {
                 invalid_info: json.to_string(),
-            })?,
+            }
+            .into()),
         }
     }
 }
