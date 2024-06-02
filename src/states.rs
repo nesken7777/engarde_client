@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     print,
-    protocol::{CardID, Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
-    read_stream, send_info,
+    protocol::{Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
+    read_stream, send_info, CardID,
 };
 
 pub const HANDS_DEFAULT_U8: u8 = 5;
@@ -221,7 +221,7 @@ impl Played {
         match self {
             Played::MoveMent(movement) => Action::Move(Movement {
                 card: movement.play_card(),
-                direction: movement.direction() ,
+                direction: movement.direction(),
             }),
             Played::Attack(attack) => Action::Attack(Attack {
                 card: attack.play_card(),

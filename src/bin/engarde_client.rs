@@ -1,8 +1,9 @@
 use engarde_client::{
     get_id, print,
-    protocol::{BoardInfo, CardID, Evaluation, Messages, PlayerID, PlayerName},
+    protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
+    CardID,
 };
 use std::{
     io::{self, BufReader, BufWriter},

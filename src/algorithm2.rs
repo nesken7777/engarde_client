@@ -4,8 +4,8 @@ use num_rational::Ratio;
 
 use crate::{
     algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable},
-    protocol::CardID,
     states::{Action, Attack, Direction, Movement, RestCards},
+    CardID,
 };
 
 //指定されたcard_idのカードを使用可能かを決める構造体

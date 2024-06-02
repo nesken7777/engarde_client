@@ -4,7 +4,7 @@ use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
 use crate::{
-    protocol::CardID,
+    CardID,
     states::{
         Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
         MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
