@@ -4,7 +4,8 @@ use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
 use crate::{
-    states::{Action, Attack, Direction, RestCards}, CardID, Maisuu, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8
+    states::{Action, Attack, Direction, RestCards},
+    CardID, Maisuu, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
 };
 
 #[derive(Debug)]

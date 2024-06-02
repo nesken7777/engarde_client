@@ -16,8 +16,6 @@ use crate::{
     read_stream, send_info, CardID, Maisuu,
 };
 
-
-
 //残りのカード枚数(種類ごと)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct RestCards {
@@ -439,7 +437,11 @@ impl From<MyState> for [f32; 16] {
             .map(|x| x.denote() as f32)
             .collect::<Vec<f32>>();
         hands.resize(5, 0.0);
-        let cards = value.cards.iter().map(|&x| x.denote() as f32).collect::<Vec<f32>>();
+        let cards = value
+            .cards
+            .iter()
+            .map(|&x| x.denote() as f32)
+            .collect::<Vec<f32>>();
         let p0_score = vec![value.p0_score as f32];
         let p1_score = vec![value.p1_score as f32];
         let my_position = vec![value.p0_position as f32];

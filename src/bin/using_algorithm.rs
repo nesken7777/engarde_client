@@ -64,7 +64,7 @@ impl MyStateAlg {
             }
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
-            use Direction::*;
+            use Direction::{Back, Forward};
             match (for_back, for_forward) {
                 (true, true) => vec![
                     Action::Move(Movement::new(card, Back)),
@@ -77,7 +77,7 @@ impl MyStateAlg {
                 }
             }
         }
-        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().cloned());
+        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().copied());
         match self.id {
             PlayerID::Zero => {
                 let moves = set
@@ -125,7 +125,11 @@ fn act(state: &MyStateAlg) -> Action {
     let distance = state.p1_position - state.p0_position;
     let acceptable = AcceptableNumbers::new(&card_map, &state.cards, distance);
     let table = ProbabilityTable::new(
-        25 - state.cards.iter().map(|x| x.denote()).sum::<u8>(),
+        25 - state
+            .cards
+            .iter()
+            .map(engarde_client::Maisuu::denote)
+            .sum::<u8>(),
         &state.cards,
     );
     let initial = initial_move(&card_map, distance, acceptable).ok();
@@ -176,7 +180,7 @@ fn main() -> io::Result<()> {
                     }
                     Messages::ServerError(e) => {
                         print("エラーもらった")?;
-                        print(format!("{:?}", e).as_str())?;
+                        print(format!("{e:?}").as_str())?;
                         break;
                     }
                     Messages::Played(played) => used_card(&mut state.cards, played.to_action()),
@@ -190,7 +194,7 @@ fn main() -> io::Result<()> {
                 },
                 Err(e) => {
                     print("JSON解析できなかった")?;
-                    print(format!("{}", e).as_str())?;
+                    print(format!("{e}").as_str())?;
                 }
             }
         }

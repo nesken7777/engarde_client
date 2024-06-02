@@ -95,7 +95,7 @@ fn main() {
     let args = Args::parse();
     match args.learning_mode {
         LearningMode::QLearning => {
-            q_learning_loop(args.final_loop, args.loop_count, args.max_score)
+            q_learning_loop(args.final_loop, args.loop_count, args.max_score);
         }
         LearningMode::Dqn => dqn_loop(args.final_loop, args.loop_count, args.max_score),
     }

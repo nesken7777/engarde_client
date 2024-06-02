@@ -65,7 +65,7 @@ impl From<io::Error> for CantAttack {
 }
 
 fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, CantAttack> {
-    use CantAttack::*;
+    use CantAttack::Lack;
     let card = CardID::from_u8(board.distance_between_enemy()).ok_or(Lack)?;
     let have = player.hand.iter().filter(|&&x| x == card).count() as u8;
     if have == 0 {
@@ -204,7 +204,7 @@ fn main() -> io::Result<()> {
                 },
                 Err(e) => {
                     print("JSON解析できなかった")?;
-                    print(format!("{}", e).as_str())?;
+                    print(format!("{e}").as_str())?;
                 }
             }
         }

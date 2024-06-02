@@ -73,12 +73,12 @@ impl ExplorationStrategy<MyState> for BestExplorationDqn {
 
 fn files_name(id: u8) -> (String, String, String, String, String, String) {
     (
-        format!("learned_dqn/{}/weight0.npy", id),
-        format!("learned_dqn/{}/bias0.npy", id),
-        format!("learned_dqn/{}/weight1.npy", id),
-        format!("learned_dqn/{}/bias1.npy", id),
-        format!("learned_dqn/{}/weight2.npy", id),
-        format!("learned_dqn/{}/bias2.npy", id),
+        format!("learned_dqn/{id}/weight0.npy"),
+        format!("learned_dqn/{id}/bias0.npy"),
+        format!("learned_dqn/{id}/weight1.npy"),
+        format!("learned_dqn/{id}/bias1.npy"),
+        format!("learned_dqn/{id}/weight2.npy"),
+        format!("learned_dqn/{id}/bias2.npy"),
     )
 }
 
@@ -139,7 +139,7 @@ fn dqn_train() -> io::Result<()> {
             bias2.load_from_npy(files.5).ok()?;
             Some(())
         })()
-        .map_or(trainer.export_learned_values(), |_| {
+        .map_or(trainer.export_learned_values(), |()| {
             (
                 (
                     Linear {
@@ -245,7 +245,7 @@ fn dqn_eval() -> io::Result<()> {
             bias2.load_from_npy(files.5).ok()?;
             Some(())
         })()
-        .map_or(trainer.export_learned_values(), |_| {
+        .map_or(trainer.export_learned_values(), |()| {
             (
                 (
                     Linear {

@@ -198,7 +198,7 @@ impl LearnedValues {
 
 fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
     // ファイル読み込み
-    let path = format!("learned{}", id);
+    let path = format!("learned{id}");
     let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
     {
         let mut data = Vec::new();
@@ -250,7 +250,7 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
                 }
             }
         };
-        let mut hand_vec = hand_info.to_vec();
+        let hand_vec = hand_info.to_vec();
         // AI用エージェント作成
         let mut agent = MyAgent::new(
             id,
@@ -271,7 +271,7 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
         learned_values = trainer.export_learned_values();
     }
     let bytes = LearnedValues::from_map(learned_values).serialize();
-    let filename = format!("learned{}", id);
+    let filename = format!("learned{id}");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
@@ -283,7 +283,7 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
 
 fn q_eval(id: u8) -> io::Result<()> {
     // ファイル読み込み
-    let path = format!("learned{}", id);
+    let path = format!("learned{id}");
     let learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
@@ -333,7 +333,7 @@ fn q_eval(id: u8) -> io::Result<()> {
         }
     };
 
-    let mut hand_vec = hand_info.to_vec();
+    let hand_vec = hand_info.to_vec();
     // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,
