@@ -3,7 +3,7 @@ use engarde_client::{
     protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
-    CardID,
+    CardID, Maisuu,
 };
 use std::{
     io::{self, BufReader, BufWriter},
@@ -85,7 +85,10 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
             }
         }
     };
-    Ok(Action::Attack(Attack::new(card, quantity)))
+    Ok(Action::Attack(Attack::new(
+        card,
+        Maisuu::new(quantity).unwrap(),
+    )))
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
@@ -124,12 +127,12 @@ fn act(
     match action {
         Action::Move(movement) => {
             let i: usize = (movement.card().denote() - 1).into();
-            cards[i] -= 1;
+            cards[i] = cards[i].saturating_sub(Maisuu::ONE);
             // send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
             let i: usize = (attack.card().denote() - 1).into();
-            cards[i] = cards[i].saturating_sub(attack.quantity() * 2);
+            cards[i] = cards[i].saturating_sub(attack.quantity().saturating_mul(2));
             // send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }

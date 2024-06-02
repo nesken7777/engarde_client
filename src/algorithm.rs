@@ -4,20 +4,16 @@ use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
 use crate::{
-    CardID,
-    states::{
-        Action, Attack, Direction, Movement, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
-        MAX_MAISUU_OF_ID_USIZE, SOKUSHI_U8,
-    },
+    states::{Action, Attack, Direction, RestCards}, CardID, Maisuu, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8
 };
 
 #[derive(Debug)]
 pub struct ProbabilityTable {
-    card1: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
-    card2: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
-    card3: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
-    card4: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
-    card5: [Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1],
+    card1: [Ratio<u64>; Maisuu::MAX.denote_usize() + 1],
+    card2: [Ratio<u64>; Maisuu::MAX.denote_usize() + 1],
+    card3: [Ratio<u64>; Maisuu::MAX.denote_usize() + 1],
+    card4: [Ratio<u64>; Maisuu::MAX.denote_usize() + 1],
+    card5: [Ratio<u64>; Maisuu::MAX.denote_usize() + 1],
 }
 
 impl ProbabilityTable {
@@ -32,7 +28,7 @@ impl ProbabilityTable {
         }
     }
 
-    fn card(&self, i: u8) -> Option<[Ratio<u64>; MAX_MAISUU_OF_ID_USIZE + 1]> {
+    fn card(&self, i: u8) -> Option<[Ratio<u64>; Maisuu::MAX.denote_usize() + 1]> {
         match i {
             1 => Some(self.card1),
             2 => Some(self.card2),
@@ -43,33 +39,36 @@ impl ProbabilityTable {
         }
     }
 
-    fn access(&self, card: u8, quantity: usize) -> Option<Ratio<u64>> {
+    fn access(&self, card: CardID, quantity: Maisuu) -> Ratio<u64> {
+        use CardID::*;
+        let idx: usize = quantity.denote().into();
         match card {
-            1 => self.card1.get(quantity).copied(),
-            2 => self.card2.get(quantity).copied(),
-            3 => self.card3.get(quantity).copied(),
-            4 => self.card4.get(quantity).copied(),
-            5 => self.card5.get(quantity).copied(),
-            _ => None,
+            One => self.card1[idx],
+            Two => self.card2[idx],
+            Three => self.card3[idx],
+            Four => self.card4[idx],
+            Five => self.card5[idx],
         }
     }
 }
 
 /// 手札からカード番号-枚数表にする
-pub fn card_map_from_hands(hands: &[CardID]) -> [u8; 5] {
+pub fn card_map_from_hands(hands: &[CardID]) -> [Maisuu; 5] {
     use CardID::{Five, Four, One, Three, Two};
     [One, Two, Three, Four, Five]
         .into_iter()
-        .map(|x| hands.iter().filter(|&&y| x == y).count() as u8)
+        .map(|x| Maisuu::new(hands.iter().filter(|&&y| x == y).count() as u8).unwrap())
         .collect::<Vec<_>>()
         .try_into()
         .unwrap()
 }
 
 /// カード番号-枚数表から手札にする
-pub fn hands_from_card_map(card_map: &[u8]) -> Vec<CardID> {
+pub fn hands_from_card_map(card_map: &[Maisuu]) -> Vec<CardID> {
     (0..5)
-        .flat_map(|i| iter::repeat(CardID::from_u8(i).unwrap()).take(card_map[i as usize].into()))
+        .flat_map(|i| {
+            iter::repeat(CardID::from_u8(i).unwrap()).take(card_map[i as usize].denote().into())
+        })
         .collect::<Vec<CardID>>()
 }
 
@@ -87,8 +86,8 @@ fn combination(n: u64, r: u64) -> u64 {
 }
 
 /// total_unvisible_cards枚(山札+相手の手札)の中にtarget_unvisible_cards枚残っているカードが相手の手札(5枚)の中にi枚ある確率のリスト(添え字i)
-fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<u64>; 6] {
-    let target_unvisible_cards: u64 = target_unvisible_cards.into();
+fn probability(target_unvisible_cards: Maisuu, total_unvisible_cards: u8) -> [Ratio<u64>; 6] {
+    let target_unvisible_cards: u64 = target_unvisible_cards.denote().into();
     let total_unvisible_cards: u64 = total_unvisible_cards.into();
     (0..=HANDS_DEFAULT_U64)
         .map(|r| {
@@ -107,16 +106,19 @@ fn probability(target_unvisible_cards: u8, total_unvisible_cards: u8) -> [Ratio<
 }
 
 trait HandsUtil {
-    fn count_cards(&self, card_id: CardID) -> u8;
+    fn count_cards(&self, card_id: CardID) -> Maisuu;
 }
 
 impl HandsUtil for &[CardID] {
-    fn count_cards(&self, card_id: CardID) -> u8 {
-        self.iter()
-            .filter(|&&i| i == card_id)
-            .count()
-            .try_into()
-            .unwrap()
+    fn count_cards(&self, card_id: CardID) -> Maisuu {
+        Maisuu::new(
+            self.iter()
+                .filter(|&&i| i == card_id)
+                .count()
+                .try_into()
+                .unwrap(),
+        )
+        .unwrap()
     }
 }
 
@@ -137,7 +139,7 @@ pub fn safe_possibility(
             if rest_cards[i] <= hands.count_cards(attack.card()) {
                 Ratio::<u64>::one()
             } else {
-                calc_possibility_attack(&card_map_from_hands(hands), table, i as u64)
+                calc_possibility_attack(&card_map_from_hands(hands), table, attack.card())
             }
         }
         Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
@@ -146,13 +148,19 @@ pub fn safe_possibility(
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
             let dup = check_twice(distance, card.denote());
-            if rest_cards[i] <= (hands.count_cards(card) - if dup { 1 } else { 0 }) {
+            if rest_cards[i]
+                <= (hands.count_cards(card).saturating_sub(if dup {
+                    Maisuu::ONE
+                } else {
+                    Maisuu::ZERO
+                }))
+            {
                 Ratio::<u64>::one()
             } else {
                 calc_possibility_move(
                     &card_map_from_hands(hands),
                     table,
-                    distance - card.denote(),
+                    CardID::from_u8(distance - card.denote()).unwrap(),
                     dup,
                 )
             }
@@ -166,7 +174,7 @@ pub fn safe_possibility(
                 calc_possibility_move(
                     &card_map_from_hands(hands),
                     table,
-                    distance + card.denote(),
+                    CardID::from_u8(distance + card.denote()).unwrap(),
                     false,
                 )
             }
@@ -180,13 +188,18 @@ fn check_twice(distance: u8, i: u8) -> bool {
 }
 
 //アタックするとき、相手にパリーされても安全な確率。兼相手が自分の枚数以下を持っている確率
-fn calc_possibility_attack(hands: &[u8], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
+fn calc_possibility_attack(
+    hands: &[Maisuu],
+    table: &ProbabilityTable,
+    card_num: CardID,
+) -> Ratio<u64> {
     // なぜ3なのかというと、3枚の攻撃の時点で勝負が決まるから
     //enemy_quantは相手のカード枚数
-    (0..SOKUSHI_U8)
-        .map(|enemy_quant| {
+    [Maisuu::ZERO, Maisuu::ONE, Maisuu::TWO, Maisuu::SOKUSHI]
+        .iter()
+        .map(|&enemy_quant| {
             if hands[card_num as usize] >= enemy_quant {
-                table.access(card_num as u8, enemy_quant as usize).unwrap()
+                table.access(card_num, enemy_quant)
             } else {
                 Ratio::<u64>::zero()
             }
@@ -195,15 +208,18 @@ fn calc_possibility_attack(hands: &[u8], table: &ProbabilityTable, card_num: u64
 }
 
 fn calc_possibility_move(
-    hands: &[u8],
+    hands: &[Maisuu],
     table: &ProbabilityTable,
-    card_num: u8,
+    card_num: CardID,
     dup: bool,
 ) -> Ratio<u64> {
-    (0..SOKUSHI_U8)
-        .map(|i| {
-            if hands[card_num as usize] - if dup { 1 } else { 0 } >= i {
-                table.access(card_num, i as usize).unwrap()
+    [Maisuu::ONE, Maisuu::TWO, Maisuu::SOKUSHI]
+        .iter()
+        .map(|&i| {
+            if hands[card_num as usize].saturating_sub(if dup { Maisuu::ONE } else { Maisuu::ZERO })
+                >= i
+            {
+                table.access(card_num, i)
             } else {
                 Ratio::<u64>::zero()
             }
@@ -245,18 +261,23 @@ pub fn win_poss_attack(
             if rest_cards[i] < hands.count_cards(attack.card()) {
                 return Ratio::<u64>::one();
             } else {
-                return calc_win_possibility(&card_map_from_hands(hands), table, i as u64);
+                return calc_win_possibility(&card_map_from_hands(hands), table, attack.card());
             }
         }
         _ => return Ratio::<u64>::zero(),
     }
-    fn calc_win_possibility(hands: &[u8], table: &ProbabilityTable, card_num: u64) -> Ratio<u64> {
+    fn calc_win_possibility(
+        hands: &[Maisuu],
+        table: &ProbabilityTable,
+        card_num: CardID,
+    ) -> Ratio<u64> {
         // なぜ3なのかというと、3枚の攻撃の時点で勝負が決まるから
         //enemy_quantは相手のカード枚数
-        (0..SOKUSHI_U8)
-            .map(|enemy_quant| {
+        [Maisuu::ZERO, Maisuu::ONE, Maisuu::TWO, Maisuu::SOKUSHI]
+            .iter()
+            .map(|&enemy_quant| {
                 if hands[card_num as usize] > enemy_quant {
-                    table.access(card_num as u8, enemy_quant as usize).unwrap()
+                    table.access(card_num, enemy_quant)
                 } else {
                     Ratio::<u64>::zero()
                 }
@@ -267,7 +288,7 @@ pub fn win_poss_attack(
 //最後の動きを決定する。(自分が最後動いて距離を決定できる場合)返り値は使うべきカード番号(card_id)
 pub fn last_move(
     restcards: RestCards,
-    hands: &[u8],
+    hands: &[Maisuu],
     position: (i64, i64),
     parried_quant: u8,
     table: &ProbabilityTable,
@@ -276,7 +297,7 @@ pub fn last_move(
     let mut last: bool = false;
     //次に自分が行う行動が最後か否か判定。trueなら最後falseなら最後ではない
     fn check_last(parried_quant: u8, restcards: &RestCards) -> bool {
-        restcards.iter().sum::<u8>() <= 1 + parried_quant
+        restcards.iter().map(|cards| cards.denote()).sum::<u8>() <= 1 + parried_quant
     }
     //自分が行動することで届く距離を求める。
     fn reachable(distance: u64, hands: &[u8]) -> Vec<u8> {
@@ -293,7 +314,7 @@ pub fn last_move(
     last = check_last(parried_quant, &restcards);
     match last {
         true => {
-            let can_attack = hands[distance as usize - 1] != 0;
+            let can_attack = hands[distance as usize - 1] != Maisuu::ZERO;
             let attack_action = Action::Attack(Attack::new(
                 CardID::from_u8(distance as u8).unwrap(),
                 hands[distance as usize],

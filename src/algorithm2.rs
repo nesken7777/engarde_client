@@ -5,7 +5,7 @@ use num_rational::Ratio;
 use crate::{
     algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable},
     states::{Action, Attack, Direction, Movement, RestCards},
-    CardID,
+    CardID, Maisuu,
 };
 
 //指定されたcard_idのカードを使用可能かを決める構造体
@@ -32,28 +32,28 @@ impl AcceptableNumbers {
     }
 
     //4と5は合計二枚以上あるなら使用可能
-    fn can_use4and5(hands: &[u8; 5], distance: u8) -> bool {
+    fn can_use4and5(hands: &[Maisuu; 5], distance: u8) -> bool {
         if distance >= 12 {
             count_4and5(hands) >= 2
         } else {
             true
         }
     }
-    fn can_use3(hands: &[u8; 5]) -> bool {
-        hands[2] > 0
+    fn can_use3(hands: &[Maisuu; 5]) -> bool {
+        hands[2] > Maisuu::ZERO
     }
     //二枚以上2があるなら使ってもよい
-    fn can_use2(hands: &[u8; 5]) -> bool {
-        hands[1] > 1
+    fn can_use2(hands: &[Maisuu; 5]) -> bool {
+        hands[1] > Maisuu::ONE
     }
 
     //1が3枚以上あるなら使ってもよい
-    fn can_use1(hands: &[u8; 5], rest: &RestCards) -> bool {
-        let usedcard_1 = 5 - rest[0];
-        hands[0] > 3 - usedcard_1
+    fn can_use1(hands: &[Maisuu; 5], rest: &RestCards) -> bool {
+        let usedcard_1 = Maisuu::FIVE.saturating_sub(rest[0]);
+        hands[0] > Maisuu::THREE.saturating_sub(usedcard_1)
     }
     //初期化
-    pub fn new(hands: &[u8; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
+    pub fn new(hands: &[Maisuu; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
         let can_use = [
             Self::can_use1(hands, rest),
             Self::can_use2(hands),
@@ -76,20 +76,24 @@ impl IndexMut<usize> for AcceptableNumbers {
         self.can_use.get_mut(index).expect("out of bound")
     }
 }
-//手札に存在する4と5の数を数える
-pub fn count_4and5(hands: &[u8; 5]) -> u8 {
-    (3..5).map(|i| hands[i]).sum()
+/// 手札に存在する4と5の数を数えます
+/// `Maisuu`はあくまでも「ある番号の上で」であるため、この関数は`Maisuu`ではなく`u8`を返します。
+pub fn count_4and5(hands: &[Maisuu; 5]) -> u8 {
+    [Maisuu::THREE, Maisuu::FOUR, Maisuu::FIVE]
+        .iter()
+        .map(|&i| hands[i.denote_usize()].denote())
+        .sum()
 }
 //三枚以上持っているカードをtrueにして返す
 pub fn more_than_three(hands: &[u8; 5]) -> Vec<bool> {
     (0..5).map(|i| hands[i] > 2).collect::<Vec<bool>>()
 }
-pub fn calc_ave(hands: &[u8; 5]) -> Ratio<u8> {
-    Ratio::from_integer((0..5).map(|i| hands[i]).sum()) / Ratio::from_integer(5)
+pub fn calc_ave(hands: &[Maisuu; 5]) -> Ratio<u8> {
+    Ratio::from_integer((0..5).map(|i| hands[i].denote()).sum()) / Ratio::from_integer(5)
 }
 //最初の動きを定義する。距離が12以下の時は別のメゾットに任せる。返り値は使うべきカード
 pub fn initial_move(
-    hands: &[u8; 5],
+    hands: &[Maisuu; 5],
     distance: u8,
     acceptable: AcceptableNumbers,
 ) -> Result<Action, &'static str> {
@@ -158,7 +162,7 @@ pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
 
 //主に7と2の距離になるように調整するプログラム。優先度3
 pub fn should_go_2_7(
-    hands: &[u8; 5],
+    hands: &[Maisuu; 5],
     distance: u8,
     rest: &RestCards,
     table: &ProbabilityTable,
@@ -173,7 +177,7 @@ pub fn should_go_2_7(
     //7の距離に行くべき状態か判断する
 
     if let Some(movement) = movement_togo7 {
-        if hands[movement.card() as usize] != 0
+        if hands[movement.card() as usize] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
             && acceptable[movement.card() as usize]
         {
@@ -182,7 +186,7 @@ pub fn should_go_2_7(
     };
     //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[movement.card() as usize] != 0
+        if hands[movement.card() as usize] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
             && acceptable[movement.card() as usize]
         {

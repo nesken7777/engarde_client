@@ -13,28 +13,24 @@ use serde::{Deserialize, Serialize};
 use crate::{
     print,
     protocol::{Evaluation, Messages, PlayAttack, PlayMovement, Played, PlayerID},
-    read_stream, send_info, CardID,
+    read_stream, send_info, CardID, Maisuu,
 };
 
-pub const HANDS_DEFAULT_U8: u8 = 5;
-pub const HANDS_DEFAULT_U64: u64 = HANDS_DEFAULT_U8 as u64;
-pub const MAX_MAISUU_OF_ID_U8: u8 = 5;
-pub const MAX_MAISUU_OF_ID_USIZE: usize = MAX_MAISUU_OF_ID_U8 as usize;
-pub const SOKUSHI_U8: u8 = HANDS_DEFAULT_U8 / 2 + 1;
+
 
 //残りのカード枚数(種類ごと)
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct RestCards {
-    cards: [u8; CardID::MAX],
+    cards: [Maisuu; CardID::MAX],
 }
 
 impl RestCards {
     pub fn new() -> Self {
         Self {
-            cards: [MAX_MAISUU_OF_ID_U8; CardID::MAX],
+            cards: [Maisuu::MAX; CardID::MAX],
         }
     }
-    pub fn from_slice(slice: &[u8]) -> RestCards {
+    pub fn from_slice(slice: &[Maisuu]) -> RestCards {
         RestCards {
             cards: slice.try_into().unwrap(),
         }
@@ -42,7 +38,7 @@ impl RestCards {
 }
 
 impl Index<usize> for RestCards {
-    type Output = u8;
+    type Output = Maisuu;
     fn index(&self, index: usize) -> &Self::Output {
         self.cards.get(index).expect("out of bound")
     }
@@ -55,7 +51,7 @@ impl IndexMut<usize> for RestCards {
 }
 
 impl Deref for RestCards {
-    type Target = [u8];
+    type Target = [Maisuu];
     fn deref(&self) -> &Self::Target {
         &self.cards
     }
@@ -65,11 +61,11 @@ pub fn used_card(cards: &mut RestCards, action: Action) {
     match action {
         Action::Move(movement) => {
             let i: usize = movement.card.denote().into();
-            cards[i - 1] -= 1;
+            cards[i - 1] = cards[i - 1].saturating_sub(Maisuu::ONE);
         }
         Action::Attack(attack) => {
             let i: usize = attack.card.denote().into();
-            cards[i - 1] = cards[i - 1].saturating_sub(attack.quantity * 2);
+            cards[i - 1] = cards[i - 1].saturating_sub(attack.quantity.saturating_mul(2));
         }
     }
 }
@@ -129,11 +125,11 @@ impl Movement {
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Attack {
     card: CardID,
-    quantity: u8,
+    quantity: Maisuu,
 }
 
 impl Attack {
-    pub fn new(card: CardID, quantity: u8) -> Self {
+    pub fn new(card: CardID, quantity: Maisuu) -> Self {
         Self { card, quantity }
     }
 
@@ -141,7 +137,7 @@ impl Attack {
         self.card
     }
 
-    pub fn quantity(&self) -> u8 {
+    pub fn quantity(&self) -> Maisuu {
         self.quantity
     }
 }
@@ -164,7 +160,7 @@ impl Action {
             }
             Action::Attack(attack) => {
                 let &Attack { card, quantity } = attack;
-                5 * 2 + 5 * (card as usize - 1) + (quantity as usize - 1)
+                5 * 2 + 5 * (card.denote() as usize - 1) + (quantity.denote() as usize - 1)
             }
         }
     }
@@ -182,7 +178,7 @@ impl Action {
                 let x = x - 10;
                 Action::Attack(Attack {
                     card: CardID::from_u8((x / 5 + 1) as u8).unwrap(),
-                    quantity: (x % 5 + 1) as u8,
+                    quantity: Maisuu::new((x % 5 + 1) as u8).unwrap(),
                 })
             }
             _ => unreachable!(),
@@ -351,7 +347,7 @@ impl State for MyState {
             if have > 0 {
                 Some(Action::Attack(Attack {
                     card,
-                    quantity: have as u8,
+                    quantity: Maisuu::new(have as u8).unwrap(),
                 }))
             } else {
                 None
@@ -443,7 +439,7 @@ impl From<MyState> for [f32; 16] {
             .map(|x| x.denote() as f32)
             .collect::<Vec<f32>>();
         hands.resize(5, 0.0);
-        let cards = value.cards.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+        let cards = value.cards.iter().map(|&x| x.denote() as f32).collect::<Vec<f32>>();
         let p0_score = vec![value.p0_score as f32];
         let p1_score = vec![value.p1_score as f32];
         let my_position = vec![value.p0_position as f32];

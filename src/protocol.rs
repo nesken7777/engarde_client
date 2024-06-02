@@ -8,7 +8,7 @@ use serde_with::skip_serializing_none;
 use crate::errors::Errors;
 
 use crate::states::{Attack, Direction, Movement};
-use crate::CardID;
+use crate::{CardID, Maisuu};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
@@ -351,14 +351,14 @@ impl PlayedAttackJson {
 #[derive(Debug)]
 pub struct PlayedAttack {
     play_card: CardID,
-    num_of_card: u8,
+    num_of_card: Maisuu,
 }
 
 impl PlayedAttack {
     fn from_deserialized(json: PlayedAttackJson) -> Self {
         Self {
             play_card: CardID::from_u8(json.play_card()).unwrap(),
-            num_of_card: json.num_of_card(),
+            num_of_card: Maisuu::new(json.num_of_card()).unwrap(),
         }
     }
 
@@ -366,7 +366,7 @@ impl PlayedAttack {
         self.play_card
     }
 
-    pub fn num_of_card(&self) -> u8 {
+    pub fn num_of_card(&self) -> Maisuu {
         self.num_of_card
     }
 }
@@ -676,7 +676,7 @@ impl PlayAttack {
             to: "Server",
             message_id: "102",
             play_card: info.card().denote().to_string(),
-            num_of_card: info.quantity().to_string(),
+            num_of_card: info.quantity().denote().to_string(),
         }
     }
 }

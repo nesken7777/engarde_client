@@ -6,13 +6,13 @@ use std::{
 use protocol::{ConnectionStart, PlayerID};
 use serde::Serialize;
 
-pub mod states;
 pub mod algorithm;
+pub mod algorithm2;
 pub mod errors;
 pub mod protocol;
-pub mod algorithm2;
+pub mod states;
 
-/// カード番号を示す。
+/// カード番号を示します。
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CardID {
     /// 番号1
@@ -59,6 +59,87 @@ impl CardID {
         }
     }
 }
+
+/// ある番号の上でのカードの枚数を示します。
+/// 0～5の値が許可されます。
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Maisuu(u8);
+
+impl Maisuu {
+    /// 最大値です。多くの場合5です。
+    pub const MAX: Maisuu = Maisuu::FIVE;
+    /// 必ず倒せる枚数です。3枚です。
+    pub const SOKUSHI: Maisuu = Maisuu::THREE;
+    /// 0枚です。
+    pub const ZERO: Maisuu = Maisuu(0);
+    /// 1枚です。
+    pub const ONE: Maisuu = Maisuu(1);
+    /// 2枚です。
+    pub const TWO: Maisuu = Maisuu(2);
+    /// 3枚です。
+    pub const THREE: Maisuu = Maisuu(3);
+    /// 4枚です。
+    pub const FOUR: Maisuu = Maisuu(4);
+    /// 5枚です。
+    pub const FIVE: Maisuu = Maisuu(5);
+    /// カード枚数を作成します。
+    /// 0～5の値までが許容され、それ以外は`None`となります。
+    pub fn new(n: u8) -> Option<Maisuu> {
+        (n <= 5).then_some(Maisuu(n))
+    }
+
+    /// カード枚数を`u8`の表現にします。
+    pub fn denote(&self) -> u8 {
+        self.0
+    }
+
+    /// カード枚数を`usize`の表現にします。
+    pub const fn denote_usize(&self) -> usize {
+        self.0 as usize
+    }
+
+    /// 内部で使用します。
+    fn new_unchecked(n: u8) -> Maisuu {
+        Maisuu(n)
+    }
+
+    /// カード枚数同士を足します。
+    /// `Maisuu::MAX`を超える場合、`None`となります。
+    pub fn checked_add(&self, other: Maisuu) -> Option<Maisuu> {
+        let n = self.0 + other.0;
+        Maisuu::new(n)
+    }
+
+    /// カード枚数同士を足します。
+    /// `Maisuu::MAX`を超える場合、`Maisuu::MAX`になります。
+    pub fn saturating_add(&self, other: Maisuu) -> Maisuu {
+        let n = self.0 + other.0;
+        (n <= 5)
+            .then_some(Maisuu::new_unchecked(n))
+            .unwrap_or(Maisuu::MAX)
+    }
+
+    /// カードを減算します。0以下は全て0となります。
+    pub fn saturating_sub(&self, other: Maisuu) -> Maisuu {
+        let n = self.0.saturating_sub(other.0);
+        Maisuu::new_unchecked(n)
+    }
+
+    /// カードを`n`倍します。
+    /// `Maisuu::MAX`を超えた場合、`Maisuu::MAX`になります。
+    pub fn saturating_mul(&self, n: u8) -> Maisuu {
+        let n = self.0.saturating_mul(n);
+        (n <= 5)
+            .then_some(Maisuu::new_unchecked(n))
+            .unwrap_or(Maisuu::MAX)
+    }
+}
+
+/// 自分と相手は通常5枚を手持ちに入れているはずです。
+pub const HANDS_DEFAULT_U8:u8 = 5;
+
+/// `HANDS_DEFAULT_U8`の`u64`版です。
+pub const HANDS_DEFAULT_U64:u64 = 5;
 
 pub fn print(string: &str) -> io::Result<()> {
     let mut stdout = std::io::stdout();

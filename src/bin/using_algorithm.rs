@@ -6,15 +6,13 @@ use std::{
 };
 
 use engarde_client::{
-    CardID,
     algorithm::{card_map_from_hands, ProbabilityTable},
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
-    protocol::{
-        BoardInfo, HandInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName,
-    },
+    protocol::{BoardInfo, HandInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info,
     states::{used_card, Action, Attack, Direction, Movement, RestCards},
+    CardID, Maisuu,
 };
 use rand::{seq::SliceRandom, thread_rng};
 
@@ -57,7 +55,10 @@ impl MyStateAlg {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             if have > 0 {
-                Some(Action::Attack(Attack::new(card, have as u8)))
+                Some(Action::Attack(Attack::new(
+                    card,
+                    Maisuu::new(have.try_into().ok()?)?,
+                )))
             } else {
                 None
             }
@@ -123,7 +124,10 @@ fn act(state: &MyStateAlg) -> Action {
     let card_map = card_map_from_hands(&state.hands);
     let distance = state.p1_position - state.p0_position;
     let acceptable = AcceptableNumbers::new(&card_map, &state.cards, distance);
-    let table = ProbabilityTable::new(25 - state.cards.iter().sum::<u8>(), &state.cards);
+    let table = ProbabilityTable::new(
+        25 - state.cards.iter().map(|x| x.denote()).sum::<u8>(),
+        &state.cards,
+    );
     let initial = initial_move(&card_map, distance, acceptable).ok();
     let middle = middle_move(&state.hands, distance, &state.cards, &table);
     let det = initial.or(middle);

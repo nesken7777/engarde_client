@@ -21,10 +21,11 @@ use engarde_client::{
     protocol::{BoardInfo, Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
-    CardID,
+    CardID, Maisuu,
 };
 
-const DESERIALIZE_ERROR_MESSAGE: &str = "デシリアライズ失敗:数がCardIDの範囲外";
+const DESERIALIZE_ERROR_MESSAGE_CARD_ID: &str = "デシリアライズ失敗:数がCardIDの範囲外";
+const DESERIALIZE_ERROR_MESSAGE_MAISUU: &str = "デシリアライズ失敗:枚数が範囲外";
 
 struct BestExploration(AgentTrainer<MyState>);
 
@@ -66,7 +67,12 @@ impl LearnedValues {
                 let state_bytes = [
                     vec![state.my_id().denote()],
                     hands,
-                    state.rest_cards().to_vec(),
+                    state
+                        .rest_cards()
+                        .to_vec()
+                        .into_iter()
+                        .map(|x| x.denote())
+                        .collect::<Vec<u8>>(),
                     state.p0_score().to_le_bytes().to_vec(),
                     state.p1_score().to_le_bytes().to_vec(),
                     vec![state.p0_position()],
@@ -89,7 +95,7 @@ impl LearnedValues {
                             }
                             Action::Attack(attack) => {
                                 let action_bytes =
-                                    vec![1, attack.card().denote(), attack.quantity()];
+                                    vec![1, attack.card().denote(), attack.quantity().denote()];
                                 [action_bytes, value.to_le_bytes().to_vec()].concat()
                             }
                         }
@@ -124,9 +130,15 @@ impl LearnedValues {
                     .iter()
                     .filter(|&&n| n != 0)
                     .copied()
-                    .map(|n| CardID::from_u8(n).expect(DESERIALIZE_ERROR_MESSAGE))
+                    .map(|n| CardID::from_u8(n).expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID))
                     .collect::<Vec<CardID>>(),
-                RestCards::from_slice(cards_bytes),
+                RestCards::from_slice(
+                    cards_bytes
+                        .iter()
+                        .map(|&x| Maisuu::new(x).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU))
+                        .collect::<Vec<Maisuu>>()
+                        .as_slice(),
+                ),
                 u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
                 u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
                 p0_position_bytes[0],
@@ -156,13 +168,14 @@ impl LearnedValues {
                             _ => unreachable!(),
                         };
                         Action::Move(Movement::new(
-                            CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE),
+                            CardID::from_u8(card_bytes[0])
+                                .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
                             direction,
                         ))
                     }
                     1 => Action::Attack(Attack::new(
-                        CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE),
-                        property_bytes[0],
+                        CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
+                        Maisuu::new(property_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU),
                     )),
                     _ => unreachable!(),
                 };
