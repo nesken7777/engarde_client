@@ -123,12 +123,13 @@ fn act(
     let action = ask_action(my_info, board_state)?;
     match action {
         Action::Move(movement) => {
-            cards[(movement.card().denote() - 1) as usize] -= 1;
+            let i: usize = (movement.card().denote() - 1).into();
+            cards[i] -= 1;
             // send_info(bufwriter, &PlayMovement::from_info(movement))?;
         }
         Action::Attack(attack) => {
-            cards[(attack.card().denote() - 1) as usize] =
-                cards[(attack.card().denote() - 1) as usize].saturating_sub(attack.quantity() * 2);
+            let i: usize = (attack.card().denote() - 1).into();
+            cards[i] = cards[i].saturating_sub(attack.quantity() * 2);
             // send_info(bufwriter, &PlayAttack::from_info(attack))?;
         }
     }
