@@ -127,7 +127,7 @@ impl CardID {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct BoardInfo {
+struct BoardInfoJson {
     #[serde(rename = "Type")]
     typ: String,
     #[serde(rename = "From")]
@@ -163,42 +163,79 @@ pub struct BoardInfo {
     current_player: Option<PlayerID>,
 }
 
-impl BoardInfo {
-    pub fn new() -> Self {
-        BoardInfo {
-            typ: String::new(),
-            from: String::new(),
-            to: String::new(),
-            player_position_0: 0,
-            player_position_1: 23,
-            player_score_0: 0,
-            player_score_1: 0,
-            num_of_deck: 15,
-            current_player: Some(PlayerID::Zero),
-        }
-    }
-
-    pub fn distance_between_enemy(&self) -> u8 {
-        (self.player_position_0 as i8 - self.player_position_1 as i8).unsigned_abs()
-    }
-
-    pub fn distance_from_middle(&self) -> (u8, u8) {
-        (
-            (12i8 - self.player_position_0 as i8).unsigned_abs(),
-            (12i8 - self.player_position_1 as i8).unsigned_abs(),
-        )
-    }
-
-    pub fn p0_position(&self) -> u8 {
+impl BoardInfoJson {
+    fn p0_position(&self) -> u8 {
         self.player_position_0
     }
 
-    pub fn p1_position(&self) -> u8 {
+    fn p1_position(&self) -> u8 {
         self.player_position_1
+    }
+
+    fn p0_score(&self) -> u32 {
+        self.player_score_0
+    }
+
+    fn p1_score(&self) -> u32 {
+        self.player_score_1
+    }
+
+    fn num_of_deck(&self) -> u8 {
+        self.num_of_deck
+    }
+
+    fn current_player(&self) -> Option<PlayerID> {
+        self.current_player
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone)]
+pub struct BoardInfo {
+    p0_position: u8,
+    p1_position: u8,
+    p0_score: u32,
+    p1_score: u32,
+    num_of_deck: u8,
+    current_player: Option<PlayerID>,
+}
+
+impl BoardInfo {
+    fn from_deserialized(info_json: &BoardInfoJson) -> Self {
+        Self {
+            p0_position: info_json.p0_position(),
+            p1_position: info_json.p1_position(),
+            p0_score: info_json.p0_score(),
+            p1_score: info_json.p1_score(),
+            num_of_deck: info_json.num_of_deck(),
+            current_player: info_json.current_player(),
+        }
+    }
+
+    pub fn p0_position(&self) -> u8 {
+        self.p0_position
+    }
+
+    pub fn p1_position(&self) -> u8 {
+        self.p1_position
+    }
+
+    pub fn distance_between_enemy(&self) -> u8 {
+        self.p1_position - self.p0_position
+    }
+
+    pub fn new() -> Self {
+        Self {
+            p0_position: 0,
+            p1_position: 23,
+            p0_score: 0,
+            p1_score: 0,
+            num_of_deck: 25,
+            current_player: Some(PlayerID::Zero),
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
 pub struct HandInfo {
     #[serde(rename = "Type")]
     typ: String,
@@ -434,7 +471,10 @@ impl Messages {
             .as_str()
             .ok_or("Typeが文字列ではない")?;
         match typ {
-            "BoardInfo" => Ok(Self::BoardInfo(serde_json::from_str(json)?)),
+            "BoardInfo" => {
+                let board_info = serde_json::from_str(json)?;
+                Ok(Self::BoardInfo(BoardInfo::from_deserialized(&board_info)))
+            }
             "HandInfo" => Ok(Self::HandInfo(serde_json::from_str(json)?)),
             "DoPlay" => Ok(Self::DoPlay(serde_json::from_value(obj)?)),
             "Accept" => Ok(Self::Accept(serde_json::from_value(obj)?)),

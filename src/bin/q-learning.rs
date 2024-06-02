@@ -198,17 +198,24 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
         let _ = read_stream(&mut bufreader)?;
 
         // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-        let mut board_info_init = BoardInfo::new();
-
-        let hand_info = loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(Messages::BoardInfo(board_info)) => {
-                    board_info_init = board_info;
+        let (board_info_init, hand_info) = {
+            let (mut board_info_init, mut hand_info_init) = (None, None);
+            loop {
+                match Messages::parse(&read_stream(&mut bufreader)?) {
+                    Ok(Messages::BoardInfo(board_info)) => {
+                        board_info_init = Some(board_info);
+                    }
+                    Ok(Messages::HandInfo(hand_info)) => {
+                        hand_info_init = Some(hand_info);
+                    }
+                    Ok(_) | Err(_) => {}
                 }
-                Ok(Messages::HandInfo(hand_info)) => {
-                    break hand_info;
+                // ここどうにかなりませんか?
+                if let (Some(board_info_init), Some(hand_info_init)) =
+                    (&board_info_init, &hand_info_init)
+                {
+                    break (board_info_init.clone(), hand_info_init.clone());
                 }
-                Ok(_) | Err(_) => {}
             }
         };
         let mut hand_vec = hand_info.to_vec();
@@ -275,17 +282,23 @@ fn q_eval(id: u8) -> io::Result<()> {
     let _ = read_stream(&mut bufreader)?;
 
     // ここは、最初に自分が持ってる手札を取得するために、AIの行動じゃなしに情報を得なならん
-    let mut board_info_init = BoardInfo::new();
-
-    let hand_info = loop {
-        match Messages::parse(&read_stream(&mut bufreader)?) {
-            Ok(Messages::BoardInfo(board_info)) => {
-                board_info_init = board_info;
+    let (board_info_init, hand_info) = {
+        let (mut board_info_init, mut hand_info_init) = (None, None);
+        loop {
+            match Messages::parse(&read_stream(&mut bufreader)?) {
+                Ok(Messages::BoardInfo(board_info)) => {
+                    board_info_init = Some(board_info);
+                }
+                Ok(Messages::HandInfo(hand_info)) => {
+                    hand_info_init = Some(hand_info);
+                }
+                Ok(_) | Err(_) => {}
             }
-            Ok(Messages::HandInfo(hand_info)) => {
-                break hand_info;
+            if let (Some(board_info_init), Some(hand_info_init)) =
+                (&board_info_init, &hand_info_init)
+            {
+                break (board_info_init.clone(), hand_info_init.clone());
             }
-            Ok(_) | Err(_) => {}
         }
     };
 
