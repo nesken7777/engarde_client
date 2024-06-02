@@ -41,8 +41,8 @@ impl MyStateAlg {
     }
 
     fn update_board(&mut self, board_info: BoardInfo) {
-        self.p0_position = board_info.player_position_0;
-        self.p1_position = board_info.player_position_1;
+        self.p0_position = board_info.p0_position();
+        self.p1_position = board_info.p1_position();
     }
 
     fn update_hands(&mut self, hand_info: HandInfo) {

@@ -116,8 +116,8 @@ fn dqn_train() -> io::Result<()> {
     let mut agent = MyAgent::new(
         id,
         hand_vec,
-        board_info_init.player_position_0,
-        board_info_init.player_position_1,
+        board_info_init.p0_position(),
+        board_info_init.p1_position(),
         bufreader,
         bufwriter,
     );
@@ -222,8 +222,8 @@ fn dqn_eval() -> io::Result<()> {
     let mut agent = MyAgent::new(
         id,
         hand_vec,
-        board_info_init.player_position_0,
-        board_info_init.player_position_1,
+        board_info_init.p0_position(),
+        board_info_init.p1_position(),
         bufreader,
         bufwriter,
     );

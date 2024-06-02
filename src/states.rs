@@ -513,7 +513,7 @@ impl Agent<MyState> for MyAgent {
                     Ok(messages) => match messages {
                         BoardInfo(board_info) => {
                             (self.state.p0_position, self.state.p1_position) =
-                                (board_info.player_position_0, board_info.player_position_1);
+                                (board_info.p0_position(), board_info.p1_position());
                         }
                         HandInfo(hand_info) => {
                             let mut hand_vec = hand_info.to_vec();

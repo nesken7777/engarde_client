@@ -138,30 +138,32 @@ pub struct BoardInfo {
         rename = "PlayerPosition_0",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_position_0: u8,
+    player_position_0: u8,
     #[serde(
         rename = "PlayerPosition_1",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_position_1: u8,
+    player_position_1: u8,
     #[serde(
         rename = "PlayerScore_0",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_0: u32,
+    player_score_0: u32,
     #[serde(
         rename = "PlayerScore_1",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub player_score_1: u32,
+    player_score_1: u32,
     #[serde(
         rename = "NumofDeck",
         deserialize_with = "deserialize_number_from_string"
     )]
-    pub num_of_deck: u8,
+    num_of_deck: u8,
     #[serde(rename = "CurrentPlayer", default)]
-    pub current_player: Option<PlayerID>,
+    current_player: Option<PlayerID>,
 }
+
+
 
 impl BoardInfo {
     pub fn new() -> Self {
@@ -187,6 +189,14 @@ impl BoardInfo {
             (12i8 - self.player_position_0 as i8).unsigned_abs(),
             (12i8 - self.player_position_1 as i8).unsigned_abs(),
         )
+    }
+
+    pub fn p0_position(&self) -> u8 {
+        self.player_position_0
+    }
+
+    pub fn p1_position(&self) -> u8 {
+        self.player_position_1
     }
 }
 

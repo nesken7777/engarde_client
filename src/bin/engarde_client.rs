@@ -87,7 +87,7 @@ fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> 
     print(
         format!(
             "p0: {}, p1: {}",
-            board.player_position_0, board.player_position_1
+            board.p0_position(), board.p1_position()
         )
         .as_str(),
     )?;
@@ -178,8 +178,8 @@ fn main() -> io::Result<()> {
                 Ok(messages) => match messages {
                     Messages::BoardInfo(board_info) => {
                         my_info.position = match my_info.id {
-                            PlayerID::Zero => board_info.player_position_0,
-                            PlayerID::One => board_info.player_position_1,
+                            PlayerID::Zero => board_info.p0_position(),
+                            PlayerID::One => board_info.p1_position(),
                         };
                         board_state = board_info;
                     }
