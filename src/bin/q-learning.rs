@@ -2,8 +2,8 @@
 
 use std::{
     collections::HashMap,
-    fs::OpenOptions,
-    io::{self, BufReader, BufWriter, Read, Write},
+    fs::{self, OpenOptions},
+    io::{self, BufReader, BufWriter, Write},
     net::{SocketAddr, TcpStream},
 };
 
@@ -19,7 +19,7 @@ use rurel::{
 };
 
 use engarde_client::{
-    get_id,
+    get_id, print,
     protocol::{Messages, PlayerID, PlayerName},
     read_stream, send_info,
     states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
@@ -42,7 +42,7 @@ impl ExplorationStrategy<MyState> for BestExploration {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
             Some(action) => {
-                println!("AIが決めた");
+                print("AIが決めた").unwrap();
                 agent.take_action(&action);
                 action
             }
@@ -61,8 +61,8 @@ impl LearnedValues {
             .flat_map(|(state, action_reward)| -> Vec<u8> {
                 let mut hands = state
                     .hands()
-                    .to_vec()
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .map(|x| x.denote())
                     .collect::<Vec<u8>>();
                 hands.resize(5, 0);
@@ -71,8 +71,8 @@ impl LearnedValues {
                     hands,
                     state
                         .rest_cards()
-                        .to_vec()
-                        .into_iter()
+                        .iter()
+                        .copied()
                         .map(|x| x.denote())
                         .collect::<Vec<u8>>(),
                     state.p0_score().to_le_bytes().to_vec(),
@@ -103,7 +103,12 @@ impl LearnedValues {
                         }
                     })
                     .collect::<Vec<u8>>();
-                [state_bytes, vec![act_rwd_len as u8], action_reward_bytes].concat()
+                [
+                    state_bytes,
+                    vec![u8::try_from(act_rwd_len).unwrap()],
+                    action_reward_bytes,
+                ]
+                .concat()
             })
             .collect::<Vec<u8>>();
         [map_len.to_le_bytes().to_vec(), state_map_bytes].concat()
@@ -158,25 +163,26 @@ impl LearnedValues {
             next_map = next_map_;
             for _ in 0..act_rwd_len {
                 let (action_bytes, next_map_) = next_map.split_at(1);
-                let (card_bytes, next_map_) = next_map_.split_at(1);
+                let (restcard_bytes, next_map_) = next_map_.split_at(1);
                 let (property_bytes, next_map_) = next_map_.split_at(1);
                 let (value_bytes, next_map_) = next_map_.split_at(8);
                 next_map = next_map_;
                 let action = match action_bytes[0] {
                     0 => {
-                        let direction = match property_bytes[0] {
+                        let direction = match property_bytes.first().unwrap() {
                             0 => Direction::Forward,
                             1 => Direction::Back,
                             _ => unreachable!(),
                         };
                         Action::Move(Movement::new(
-                            CardID::from_u8(card_bytes[0])
+                            CardID::from_u8(restcard_bytes.first().copied().unwrap())
                                 .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
                             direction,
                         ))
                     }
                     1 => Action::Attack(Attack::new(
-                        CardID::from_u8(card_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
+                        CardID::from_u8(restcard_bytes[0])
+                            .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
                         Maisuu::new(property_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU),
                     )),
                     _ => unreachable!(),
@@ -201,10 +207,7 @@ impl LearnedValues {
 fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
     // ファイル読み込み
     let path = format!("learned{id}");
-    let mut learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path.as_str())
-    {
-        let mut data = Vec::new();
-        file.read_to_end(&mut data).unwrap();
+    let mut learned_values = if let Ok(data) = fs::read(path) {
         LearnedValues::deserialize(&data).get()
     } else {
         HashMap::new()
@@ -286,9 +289,7 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
 fn q_eval(id: u8) -> io::Result<()> {
     // ファイル読み込み
     let path = format!("learned{id}");
-    let learned_values = if let Ok(mut file) = OpenOptions::new().read(true).open(path) {
-        let mut data = Vec::new();
-        file.read_to_end(&mut data).unwrap();
+    let learned_values = if let Ok(data) = fs::read(path) {
         LearnedValues::deserialize(&data).get()
     } else {
         HashMap::new()

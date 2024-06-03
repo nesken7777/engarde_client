@@ -8,13 +8,13 @@ use engarde_client::{
     CardID, Maisuu,
 };
 use std::{
-    io::{self, BufReader, BufWriter},
+    io::{self, stdin, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
 };
 
 fn read_keyboard() -> io::Result<String> {
     let mut word = String::new();
-    std::io::stdin().read_line(&mut word)?;
+    stdin().read_line(&mut word)?;
     let response = word.trim().to_string();
     Ok(response)
 }
@@ -30,12 +30,10 @@ fn ask_card(player: &PlayerProperty) -> io::Result<CardID> {
             print("カード番号の範囲外だ")?;
             continue;
         };
-        if !player.hand.contains(&card) {
-            print("そのカードは無いよ")?;
-            continue;
-        } else {
+        if player.hand.contains(&card) {
             break Ok(card);
         }
+        print("そのカードは無いよ")?;
     }
 }
 
@@ -69,7 +67,7 @@ impl From<io::Error> for CantAttack {
 fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, CantAttack> {
     use CantAttack::Lack;
     let card = CardID::from_u8(board.distance_between_enemy()).ok_or(Lack)?;
-    let have = player.hand.iter().filter(|&&x| x == card).count() as u8;
+    let have = u8::try_from(player.hand.iter().filter(|&&x| x == card).count()).unwrap();
     if have == 0 {
         return Err(Lack);
     }
@@ -82,9 +80,8 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
             };
             if quantity <= have {
                 break quantity;
-            } else {
-                print("そんなにたくさん持っていないですよ")?;
             }
+            print("そんなにたくさん持っていないですよ")?;
         }
     };
     Ok(Action::Attack(Attack::new(

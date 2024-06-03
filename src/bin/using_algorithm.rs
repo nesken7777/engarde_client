@@ -43,7 +43,7 @@ impl MyStateAlg {
         }
     }
 
-    fn update_board(&mut self, board_info: BoardInfo) {
+    fn update_board(&mut self, board_info: &BoardInfo) {
         self.p0_position = board_info.p0_position();
         self.p1_position = board_info.p1_position();
     }
@@ -56,14 +56,9 @@ impl MyStateAlg {
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
-            if have > 0 {
-                Some(Action::Attack(Attack::new(
-                    card,
-                    Maisuu::new(have.try_into().ok()?)?,
-                )))
-            } else {
-                None
-            }
+            let have = u8::try_from(have).ok()?;
+            let have = Maisuu::new(have)?;
+            (have > Maisuu::ZERO).then(|| Action::Attack(Attack::new(card, have)))
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
             use Direction::{Back, Forward};
@@ -79,7 +74,11 @@ impl MyStateAlg {
                 }
             }
         }
-        let set = HashSet::<_, RandomState>::from_iter(self.hands.iter().copied());
+        let set = self
+            .hands
+            .iter()
+            .copied()
+            .collect::<HashSet<_, RandomState>>();
         match self.id {
             PlayerID::Zero => {
                 let moves = set
@@ -144,10 +143,10 @@ fn act(state: &MyStateAlg) -> Action {
     })
 }
 
-fn send_action(writer: &mut BufWriter<TcpStream>, action: &Action) -> io::Result<()> {
+fn send_action(writer: &mut BufWriter<TcpStream>, action: Action) -> io::Result<()> {
     match action {
-        Action::Move(m) => send_info(writer, &PlayMovement::from_info(*m)),
-        Action::Attack(a) => send_info(writer, &PlayAttack::from_info(*a)),
+        Action::Move(m) => send_info(writer, &PlayMovement::from_info(m)),
+        Action::Attack(a) => send_info(writer, &PlayAttack::from_info(a)),
     }
 }
 
@@ -169,7 +168,7 @@ fn main() -> io::Result<()> {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
                     Messages::BoardInfo(board_info) => {
-                        state.update_board(board_info);
+                        state.update_board(&board_info);
                     }
                     Messages::HandInfo(hand_info) => {
                         state.update_hands(hand_info.to_vec());
@@ -177,7 +176,7 @@ fn main() -> io::Result<()> {
                     Messages::Accept(_) => (),
                     Messages::DoPlay(_) => {
                         let action = act(&state);
-                        send_action(&mut bufwriter, &action)?;
+                        send_action(&mut bufwriter, action)?;
                         used_card(&mut state.cards, action);
                     }
                     Messages::ServerError(e) => {

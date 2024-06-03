@@ -1,6 +1,6 @@
 //! 繰り返し学習させるアプリ
 
-use std::{fmt::Display, process::Command};
+use std::{fmt::{Display, Formatter, Result}, process::Command};
 
 use clap::{Parser, ValueEnum};
 use engarde_client::print;
@@ -16,7 +16,7 @@ enum LearningMode {
 }
 
 impl Display for LearningMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let s = match self {
             LearningMode::QLearning => "q-learning",
             LearningMode::Dqn => "dqn",
