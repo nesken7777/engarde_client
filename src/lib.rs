@@ -1,3 +1,5 @@
+//! En Gardeのクライアント用ライブラリ
+
 use std::{
     io::{self, BufRead, BufReader, BufWriter, Write},
     net::TcpStream,
@@ -94,6 +96,8 @@ impl Maisuu {
     }
 
     /// カード枚数を`usize`の表現にします。
+    // clippyごめｎ
+    #[allow(clippy::as_conversions)]
     pub const fn denote_usize(&self) -> usize {
         self.0 as usize
     }

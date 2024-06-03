@@ -1,3 +1,8 @@
+#![allow(clippy::all)]
+#![allow(missing_docs)]
+#![allow(clippy::absolute_paths)]
+#![allow(dead_code)]
+
 //! 通信プロトコル
 
 use std::{error::Error, fmt::Display};
@@ -53,10 +58,8 @@ impl<'de> Deserialize<'de> for PlayerID {
                 E: serde::de::Error,
             {
                 match v.trim() {
-                    "0" => Ok(PlayerID::Zero),
-                    "1" => Ok(PlayerID::One),
-                    "Zero" => Ok(PlayerID::Zero),
-                    "One" => Ok(PlayerID::One),
+                    "0" | "Zero" => Ok(PlayerID::Zero),
+                    "1" | "One" => Ok(PlayerID::One),
                     _ => Err(E::invalid_value(serde::de::Unexpected::Str(v), &self)),
                 }
             }
@@ -193,7 +196,7 @@ impl BoardInfo {
     }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct HandInfo {
     #[serde(rename = "Type")]
     typ: String,
@@ -222,6 +225,7 @@ pub struct HandInfo {
 }
 
 impl HandInfo {
+    #[allow(clippy::similar_names)]
     pub fn to_vec(&self) -> Vec<CardID> {
         let hand1 = CardID::from_u8(self.hand1);
         let hand2 = CardID::from_u8(self.hand2);
@@ -237,7 +241,7 @@ impl HandInfo {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct DoPlay {
     #[serde(rename = "Type")]
     typ: String,
@@ -254,7 +258,7 @@ pub struct DoPlay {
     message: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Accept {
     #[serde(rename = "Type")]
     typ: String,
@@ -302,7 +306,7 @@ pub struct PlayedMoveMent {
 }
 
 impl PlayedMoveMent {
-    fn from_deserialized(json: PlayedMoveMentJson) -> Self {
+    fn from_deserialized(json: &PlayedMoveMentJson) -> Self {
         Self {
             play_card: CardID::from_u8(json.play_card()).unwrap(),
             direction: Direction::from_str(json.direction()).unwrap(),
@@ -357,7 +361,7 @@ pub struct PlayedAttack {
 }
 
 impl PlayedAttack {
-    fn from_deserialized(json: PlayedAttackJson) -> Self {
+    fn from_deserialized(json: &PlayedAttackJson) -> Self {
         Self {
             play_card: CardID::from_u8(json.play_card()).unwrap(),
             num_of_card: Maisuu::new(json.num_of_card()).unwrap(),
@@ -445,8 +449,9 @@ pub struct ServerError {
     message_id: String,
 }
 
-//ゲーム中に繰り返し受信されるJSON達
-// ConnectionStartとNameReceivedは最初しか来ないので除外
+///ゲーム中に繰り返し受信されるJSON達
+/// `ConnectionStart`と`NameReceived`は最初しか来ないので除外
+#[derive(Debug)]
 pub enum Messages {
     BoardInfo(BoardInfo),
     HandInfo(HandInfo),
@@ -472,6 +477,9 @@ impl Display for ParseMessageError {
 impl Error for ParseMessageError {}
 
 impl Messages {
+    /// サーバーから送られてくるメッセージをパースします
+    /// # Errors
+    /// パースに失敗した場合にエラーを返します。
     pub fn parse(json: &str) -> Result<Messages, Errors> {
         let obj = serde_json::from_str::<Value>(json)?;
         let typ = obj
@@ -497,15 +505,15 @@ impl Messages {
                     .ok_or("MessageIDが文字列ではない")?;
                 match message_id {
                     "101" => {
-                        let played_movement_info = serde_json::from_value(obj)?;
+                        let played_movement_info: PlayedMoveMentJson = serde_json::from_value(obj)?;
                         Ok(Self::Played(Played::MoveMent(
-                            PlayedMoveMent::from_deserialized(played_movement_info),
+                            PlayedMoveMent::from_deserialized(&played_movement_info),
                         )))
                     }
                     "102" => {
                         let played_attack_info = serde_json::from_value(obj)?;
                         Ok(Self::Played(Played::Attack(
-                            PlayedAttack::from_deserialized(played_attack_info),
+                            PlayedAttack::from_deserialized(&played_attack_info),
                         )))
                     }
                     _ => Err(ParseMessageError {
@@ -541,7 +549,7 @@ impl ConnectionStart {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PlayerName {
     #[serde(rename = "Type")]
     typ: &'static str,
@@ -575,7 +583,7 @@ pub struct NameReceived {
 }
 
 #[skip_serializing_none]
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Evaluation {
     #[serde(rename = "Type")]
     typ: &'static str,
@@ -631,7 +639,7 @@ impl Evaluation {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PlayMovement {
     #[serde(rename = "Type")]
     typ: &'static str,
@@ -660,7 +668,7 @@ impl PlayMovement {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PlayAttack {
     #[serde(rename = "Type")]
     typ: &'static str,

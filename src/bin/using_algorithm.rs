@@ -124,7 +124,7 @@ impl MyStateAlg {
 fn act(state: &MyStateAlg) -> Action {
     let card_map = card_map_from_hands(&state.hands);
     let distance = state.p1_position - state.p0_position;
-    let acceptable = AcceptableNumbers::new(&card_map, &state.cards, distance);
+    let acceptable = AcceptableNumbers::new(card_map, state.cards, distance);
     let table = ProbabilityTable::new(
         25 - state
             .cards
@@ -133,8 +133,8 @@ fn act(state: &MyStateAlg) -> Action {
             .sum::<u8>(),
         &state.cards,
     );
-    let initial = initial_move(&card_map, distance, acceptable).ok();
-    let middle = middle_move(&state.hands, distance, &state.cards, &table);
+    let initial = initial_move(&card_map, distance, &acceptable).ok();
+    let middle = middle_move(&state.hands, distance, state.cards, &table);
     let det = initial.or(middle);
     det.unwrap_or({
         let mut rng = thread_rng();

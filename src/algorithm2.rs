@@ -10,52 +10,54 @@ use crate::{
     CardID, Maisuu,
 };
 
-//指定されたcard_idのカードを使用可能かを決める構造体
+/// 指定された`card_id`のカードを使用可能かを決める構造体
+#[derive(Debug)]
 pub struct AcceptableNumbers {
     can_use: [bool; 5],
 }
+
 impl AcceptableNumbers {
-    //特定の番号が使用可能かどうかを返す
-    fn can_use(&self, card_id: u8) -> Result<bool, &'static str> {
-        match card_id {
-            1..=5 => Ok(self.can_use[card_id as usize]),
-            _ => Err("カードidがおかしいよ"),
-        }
-    }
-    //acceptablenumbers構造体に値を登録する
-    fn register(&mut self, card_id: u8, value: bool) -> Result<(), &'static str> {
-        match card_id {
-            1..=5 => {
-                self.can_use[card_id as usize] = value;
-                Ok(())
-            }
-            _ => Err("カードidがおかしいよ"),
-        }
-    }
+    /// 特定の番号が使用可能かどうかを返す
+    // fn can_use(&self, card_id: u8) -> Result<bool, &'static str> {
+    //     match card_id {
+    //         1..=5 => Ok(self.can_use[card_id as usize]),
+    //         _ => Err("カードidがおかしいよ"),
+    //     }
+    // }
+    /// acceptablenumbers構造体に値を登録する
+    // fn register(&mut self, card_id: u8, value: bool) -> Result<(), &'static str> {
+    //     match card_id {
+    //         1..=5 => {
+    //             self.can_use[card_id as usize] = value;
+    //             Ok(())
+    //         }
+    //         _ => Err("カードidがおかしいよ"),
+    //     }
+    // }
 
     //4と5は合計二枚以上あるなら使用可能
-    fn can_use4and5(hands: &[Maisuu; 5], distance: u8) -> bool {
+    fn can_use4and5(hands: [Maisuu; 5], distance: u8) -> bool {
         if distance >= 12 {
             count_4and5(hands) >= 2
         } else {
             true
         }
     }
-    fn can_use3(hands: &[Maisuu; 5]) -> bool {
+    fn can_use3(hands: [Maisuu; 5]) -> bool {
         hands[2] > Maisuu::ZERO
     }
     //二枚以上2があるなら使ってもよい
-    fn can_use2(hands: &[Maisuu; 5]) -> bool {
+    fn can_use2(hands: [Maisuu; 5]) -> bool {
         hands[1] > Maisuu::ONE
     }
 
     //1が3枚以上あるなら使ってもよい
-    fn can_use1(hands: &[Maisuu; 5], rest: &RestCards) -> bool {
+    fn can_use1(hands: [Maisuu; 5], rest: RestCards) -> bool {
         let usedcard_1 = Maisuu::FIVE.saturating_sub(rest[0]);
         hands[0] > Maisuu::THREE.saturating_sub(usedcard_1)
     }
-    //初期化
-    pub fn new(hands: &[Maisuu; 5], rest: &RestCards, distance: u8) -> AcceptableNumbers {
+    /// 初期化
+    pub fn new(hands: [Maisuu; 5], rest: RestCards, distance: u8) -> AcceptableNumbers {
         let can_use = [
             Self::can_use1(hands, rest),
             Self::can_use2(hands),
@@ -80,24 +82,27 @@ impl IndexMut<usize> for AcceptableNumbers {
 }
 /// 手札に存在する4と5の数を数えます
 /// `Maisuu`はあくまでも「ある番号の上で」であるため、この関数は`Maisuu`ではなく`u8`を返します。
-pub fn count_4and5(hands: &[Maisuu; 5]) -> u8 {
+pub fn count_4and5(hands: [Maisuu; 5]) -> u8 {
     [Maisuu::THREE, Maisuu::FOUR, Maisuu::FIVE]
         .iter()
         .map(|&i| hands[i.denote_usize()].denote())
         .sum()
 }
-//三枚以上持っているカードをtrueにして返す
+/// 三枚以上持っているカードをtrueにして返す
 pub fn more_than_three(hands: &[u8; 5]) -> Vec<bool> {
     (0..5).map(|i| hands[i] > 2).collect::<Vec<bool>>()
 }
+/// カード番号の大きさの平均
 pub fn calc_ave(hands: &[Maisuu; 5]) -> Ratio<u8> {
     Ratio::from_integer((0..5).map(|i| hands[i].denote()).sum()) / Ratio::from_integer(5)
 }
-//最初の動きを定義する。距離が12以下の時は別のメゾットに任せる。返り値は使うべきカード
+/// 最初の動きを定義する。距離が12以下の時は別のメゾットに任せる。返り値は使うべきカード
+/// # Errors
+/// `distance`が12より大きい場合、エラーです。
 pub fn initial_move(
     hands: &[Maisuu; 5],
     distance: u8,
-    acceptable: AcceptableNumbers,
+    acceptable: &AcceptableNumbers,
 ) -> Result<Action, &'static str> {
     //距離が12以下なら他のプログラムに任せる
     if distance <= 12 {
@@ -106,9 +111,9 @@ pub fn initial_move(
     //4と5が使用可能か問い合わせる
 
     for i in (0..5).rev() {
-        if acceptable[i as usize] {
+        if acceptable[usize::from(i)] {
             return Ok(Action::Move(Movement::new(
-                CardID::from_u8(i).unwrap(),
+                CardID::from_u8(i).ok_or("意味わからんけど")?,
                 Direction::Forward,
             )));
         }
@@ -119,23 +124,26 @@ pub fn initial_move(
     //clippyに従うとエラーになった
     if average < Ratio::from_integer(3) {
         Ok(Action::Move(Movement::new(
-            CardID::from_u8(2).unwrap(),
+            CardID::from_u8(2).ok_or("意味わからんけど")?,
             Direction::Forward,
         )))
     } else {
         Ok(Action::Move(Movement::new(
-            CardID::from_u8(5).unwrap(),
+            CardID::from_u8(5).ok_or("意味わからんけど")?,
             Direction::Forward,
         )))
     }
 }
-//自分の手札で到達し得る相手との距離のvecを返す。
+/// 自分の手札で到達し得る相手との距離のvecを返す。
+/// # Panics
+/// `todo!()`があります
+
 pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
     let vec1 = hands
         .iter()
         .map(|i| {
-            if distance as i8 - *i as i8 > 0 {
-                distance as i8 - *i as i8
+            if i8::try_from(distance).unwrap() - i8::try_from(*i).unwrap() > 0 {
+                i8::try_from(distance).unwrap() - i8::try_from(*i).unwrap()
             } else {
                 todo!()
             }
@@ -143,30 +151,31 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
         .collect::<Vec<_>>();
     let vec2 = hands
         .iter()
-        .map(|i| distance as i8 + *i as i8)
+        .map(|i| i8::try_from(distance).unwrap() + i8::try_from(*i).unwrap())
         .collect::<Vec<_>>();
     [vec1, vec2].concat()
 }
-//nが指定する距離に行くために行うActionを返す
+/// `n`が指定する距離に行くために行うActionを返す
 pub fn action_togo(n: u8, distance: u8) -> Option<Action> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
     match n.cmp(&distance) {
-        std::cmp::Ordering::Greater => Some(Action::Move(Movement::new(
-            CardID::from_u8(n - distance).unwrap(),
+        Greater => Some(Action::Move(Movement::new(
+            CardID::from_u8(n - distance)?,
             Direction::Back,
         ))),
-        std::cmp::Ordering::Less => Some(Action::Move(Movement::new(
-            CardID::from_u8(distance - n).unwrap(),
+        Less => Some(Action::Move(Movement::new(
+            CardID::from_u8(distance - n)?,
             Direction::Forward,
         ))),
-        std::cmp::Ordering::Equal => None,
+        Equal => None,
     }
 }
 
-//主に7と2の距離になるように調整するプログラム。優先度3
+/// 主に7と2の距離になるように調整するプログラム。優先度3
 pub fn should_go_2_7(
-    hands: &[Maisuu; 5],
+    hands: [Maisuu; 5],
     distance: u8,
-    rest: &RestCards,
+    rest: RestCards,
     _table: &ProbabilityTable,
 ) -> Option<Action> {
     let acceptable = AcceptableNumbers::new(hands, rest, distance);
@@ -179,18 +188,18 @@ pub fn should_go_2_7(
     //7の距離に行くべき状態か判断する
 
     if let Some(movement) = movement_togo7 {
-        if hands[movement.card() as usize] != Maisuu::ZERO
+        if hands[usize::from(movement.card().denote())] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[movement.card() as usize]
+            && acceptable[usize::from(movement.card().denote())]
         {
             return togo7;
         }
     };
     //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[movement.card() as usize] != Maisuu::ZERO
+        if hands[usize::from(movement.card().denote())] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[movement.card() as usize]
+            && acceptable[usize::from(movement.card().denote())]
         {
             return togo2;
         }
@@ -199,27 +208,28 @@ pub fn should_go_2_7(
     None
 }
 
+/// 通常行動
+/// # Panics
+/// 使ってる`safe_possibility`による！
 pub fn middle_move(
     hands: &[CardID],
     distance: u8,
-    rest: &RestCards,
+    rest: RestCards,
     table: &ProbabilityTable,
 ) -> Option<Action> {
-    let att_action = if distance <= 5 {
-        Some(Action::Attack(Attack::new(
+    let att_action = (distance <= 5).then(|| {
+        Action::Attack(Attack::new(
             CardID::from_u8(distance).unwrap(),
-            card_map_from_hands(hands)[(distance - 1) as usize],
-        )))
-    } else {
-        None
-    };
+            card_map_from_hands(hands)[usize::from(distance - 1)],
+        ))
+    });
     //優先度高い
     let att_action = att_action.filter(|&att_action| {
         win_poss_attack(rest, hands, table, att_action) >= Ratio::from_integer(3) / 4
     });
 
     let mov_action =
-        should_go_2_7(&card_map_from_hands(hands), distance, rest, table).filter(|&mov_action| {
+        should_go_2_7(card_map_from_hands(hands), distance, rest, table).filter(|&mov_action| {
             safe_possibility(distance, rest, hands, table, mov_action) >= Ratio::from_integer(3) / 4
         });
 
