@@ -55,7 +55,7 @@ impl MyStateAlg {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
             let have = hands.iter().filter(|&&x| x == card).count();
             let have = u8::try_from(have).ok()?;
-            let have = Maisuu::new(have)?;
+            let have = Maisuu::from_u8(have)?;
             (have > Maisuu::ZERO).then(|| Action::Attack(Attack::new(card, have)))
         }
         fn decide_moves(for_back: bool, for_forward: bool, card: CardID) -> Vec<Action> {
@@ -137,7 +137,7 @@ fn act(state: &MyStateAlg) -> Action {
     det.unwrap_or({
         let mut rng = thread_rng();
         let actions = state.actions();
-        actions.choose(&mut rng).copied().unwrap()
+        actions.choose(&mut rng).copied().expect("できる行動が何一つない")
     })
 }
 

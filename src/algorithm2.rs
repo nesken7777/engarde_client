@@ -5,7 +5,8 @@ use std::ops::{Index, IndexMut};
 use num_rational::Ratio;
 
 use crate::{
-    algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable}, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards
+    algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable},
+    Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
 };
 
 /// 指定された`card_id`のカードを使用可能かを決める構造体
@@ -140,8 +141,10 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
     let vec1 = hands
         .iter()
         .map(|i| {
-            if i8::try_from(distance).unwrap() - i8::try_from(*i).unwrap() > 0 {
-                i8::try_from(distance).unwrap() - i8::try_from(*i).unwrap()
+            if i8::try_from(distance).expect("i8の境界内") - i8::try_from(*i).expect("i8の境界内")
+                > 0
+            {
+                i8::try_from(distance).expect("i8の境界内") - i8::try_from(*i).expect("i8の境界内")
             } else {
                 todo!()
             }
@@ -149,7 +152,9 @@ pub fn reachable(hands: &[u8; 5], distance: u8) -> Vec<i8> {
         .collect::<Vec<_>>();
     let vec2 = hands
         .iter()
-        .map(|i| i8::try_from(distance).unwrap() + i8::try_from(*i).unwrap())
+        .map(|i| {
+            i8::try_from(distance).expect("i8の境界内") + i8::try_from(*i).expect("i8の境界内")
+        })
         .collect::<Vec<_>>();
     [vec1, vec2].concat()
 }
@@ -217,7 +222,7 @@ pub fn middle_move(
 ) -> Option<Action> {
     let att_action = (distance <= 5).then(|| {
         Action::Attack(Attack::new(
-            CardID::from_u8(distance).unwrap(),
+            CardID::from_u8(distance).expect("CardIDの境界内"),
             card_map_from_hands(hands)[usize::from(distance - 1)],
         ))
     });

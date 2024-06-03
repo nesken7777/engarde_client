@@ -19,7 +19,11 @@ use rurel::{
 };
 
 use engarde_client::{
-    get_id, print, protocol::{Messages, PlayerID, PlayerName}, read_stream, send_info, states::{MyAgent, MyState}, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards
+    get_id, print,
+    protocol::{Messages, PlayerID, PlayerName},
+    read_stream, send_info,
+    states::{MyAgent, MyState},
+    Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
 };
 
 const DESERIALIZE_ERROR_MESSAGE_CARD_ID: &str = "デシリアライズ失敗:数がCardIDの範囲外";
@@ -38,7 +42,7 @@ impl ExplorationStrategy<MyState> for BestExploration {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
             Some(action) => {
-                print("AIが決めた").unwrap();
+                print("AIが決めた").expect("出力に失敗");
                 agent.take_action(&action);
                 action
             }
@@ -101,7 +105,7 @@ impl LearnedValues {
                     .collect::<Vec<u8>>();
                 [
                     state_bytes,
-                    vec![u8::try_from(act_rwd_len).unwrap()],
+                    vec![u8::try_from(act_rwd_len).expect("u8の境界内")],
                     action_reward_bytes,
                 ]
                 .concat()
@@ -111,7 +115,7 @@ impl LearnedValues {
     }
     fn deserialize(bytes: &[u8]) -> LearnedValues {
         let (map_len_bytes, state_map_bytes) = bytes.split_at(8);
-        let map_len = usize::from_le_bytes(map_len_bytes.try_into().unwrap());
+        let map_len = usize::from_le_bytes(map_len_bytes.try_into().expect("長さが8"));
         let mut state_map: HashMap<MyState, HashMap<Action, f64>> = HashMap::new();
         let mut next_map = state_map_bytes;
         for _ in 0..map_len {
@@ -128,7 +132,7 @@ impl LearnedValues {
             let (game_end_bytes, _) = state_rest.split_at(1);
 
             let state = MyState::new(
-                PlayerID::from_u8(my_id_bytes[0]).unwrap(),
+                PlayerID::from_u8(my_id_bytes[0]).expect("PlayerIDの境界内"),
                 hands_bytes
                     .iter()
                     .filter(|&&n| n != 0)
@@ -138,12 +142,12 @@ impl LearnedValues {
                 RestCards::from_slice(
                     cards_bytes
                         .iter()
-                        .map(|&x| Maisuu::new(x).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU))
+                        .map(|&x| Maisuu::from_u8(x).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU))
                         .collect::<Vec<Maisuu>>()
                         .as_slice(),
                 ),
-                u32::from_le_bytes(p0_score_bytes.try_into().unwrap()),
-                u32::from_le_bytes(p1_score_bytes.try_into().unwrap()),
+                u32::from_le_bytes(p0_score_bytes.try_into().expect("長さが4")),
+                u32::from_le_bytes(p1_score_bytes.try_into().expect("長さが4")),
                 p0_position_bytes[0],
                 p1_position_bytes[0],
                 match game_end_bytes[0] {
@@ -165,25 +169,31 @@ impl LearnedValues {
                 next_map = next_map_;
                 let action = match action_bytes[0] {
                     0 => {
-                        let direction = match property_bytes.first().unwrap() {
+                        let direction = match property_bytes.first().expect("1バイト目の取得に失敗")
+                        {
                             0 => Direction::Forward,
                             1 => Direction::Back,
                             _ => unreachable!(),
                         };
                         Action::Move(Movement::new(
-                            CardID::from_u8(restcard_bytes.first().copied().unwrap())
-                                .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
+                            CardID::from_u8(
+                                restcard_bytes
+                                    .first()
+                                    .copied()
+                                    .expect("1バイト目の取得に失敗"),
+                            )
+                            .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
                             direction,
                         ))
                     }
                     1 => Action::Attack(Attack::new(
                         CardID::from_u8(restcard_bytes[0])
                             .expect(DESERIALIZE_ERROR_MESSAGE_CARD_ID),
-                        Maisuu::new(property_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU),
+                        Maisuu::from_u8(property_bytes[0]).expect(DESERIALIZE_ERROR_MESSAGE_MAISUU),
                     )),
                     _ => unreachable!(),
                 };
-                let value = f64::from_le_bytes(value_bytes.try_into().unwrap());
+                let value = f64::from_le_bytes(value_bytes.try_into().expect("長さが8"));
                 act_rwd_map.insert(action, value);
             }
             state_map.insert(state, act_rwd_map);

@@ -6,7 +6,7 @@ use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
 use crate::{
-    Action, Attack, CardID, Direction, Maisuu, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8
+    Action, Attack, CardID, Direction, Maisuu, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
 };
 
 /// 相手の手札にカード番号`i`が`j`枚ある確率
@@ -61,27 +61,31 @@ impl ProbabilityTable {
 /// 絶対にpanicしない自信があります!
 pub fn card_map_from_hands(hands: &[CardID]) -> [Maisuu; 5] {
     use CardID::{Five, Four, One, Three, Two};
+    assert!(hands.len() <= 5);
     [One, Two, Three, Four, Five]
         .into_iter()
         .map(|x| {
-            Maisuu::new(u8::try_from(hands.iter().filter(|&&y| x == y).count()).unwrap()).unwrap()
+            let have = hands.iter().filter(|&&y| x == y).count();
+            Maisuu::from_usize(have).expect("Maisuuの境界内")
         })
         .collect::<Vec<_>>()
         .try_into()
-        .unwrap()
+        .expect("必ず長さが5")
 }
 
 /// カード番号-枚数表から手札にします。
 /// # Panics
 /// 絶対にpanicしない自信があります!
 pub fn hands_from_card_map(card_map: &[Maisuu]) -> [CardID; 5] {
+    assert_eq!(card_map.len(), 5);
     (0..5)
         .flat_map(|i| {
-            iter::repeat(CardID::from_u8(i).unwrap()).take(card_map[usize::from(i)].denote().into())
+            iter::repeat(CardID::from_u8(i).expect("必ず1~5の範囲内"))
+                .take(card_map[usize::from(i)].denote_usize())
         })
         .collect::<Vec<CardID>>()
         .try_into()
-        .unwrap()
+        .expect("必ず長さが5")
 }
 
 fn permutation(n: u64, r: u64) -> u64 {
@@ -114,7 +118,7 @@ fn probability(target_unvisible_cards: Maisuu, total_unvisible_cards: u8) -> [Ra
         })
         .collect::<Vec<Ratio<u64>>>()
         .try_into()
-        .unwrap()
+        .expect("必ず長さが6")
 }
 
 trait HandsUtil {
@@ -123,15 +127,8 @@ trait HandsUtil {
 
 impl<T: AsRef<[CardID]>> HandsUtil for T {
     fn count_cards(&self, card_id: CardID) -> Maisuu {
-        Maisuu::new(
-            self.as_ref()
-                .iter()
-                .filter(|&&i| i == card_id)
-                .count()
-                .try_into()
-                .unwrap(),
-        )
-        .unwrap()
+        Maisuu::from_usize(self.as_ref().iter().filter(|&&i| i == card_id).count())
+            .expect("必ずMaisuuの境界内")
     }
 }
 
@@ -159,7 +156,7 @@ pub fn safe_possibility(
         }
         Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
             let card = movement.card();
-            let i: usize = card.denote().into();
+            let i = card.denote_usize();
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
             let dup = check_twice(distance, card.denote());
@@ -171,13 +168,10 @@ pub fn safe_possibility(
                 }))
             {
                 Ratio::<u64>::one()
+            } else if let Some(card_id) = CardID::from_u8(distance - card.denote()) {
+                calc_possibility_move(&card_map_from_hands(hands), table, card_id, dup)
             } else {
-                calc_possibility_move(
-                    &card_map_from_hands(hands),
-                    table,
-                    CardID::from_u8(distance - card.denote()).unwrap(),
-                    dup,
-                )
+                Ratio::<u64>::zero()
             }
         }
         Action::Move(movement) => {
@@ -185,13 +179,10 @@ pub fn safe_possibility(
             let i: usize = card.denote().into();
             if rest_cards[i] <= hands.count_cards(card) {
                 Ratio::<u64>::one()
+            } else if let Some(card_id) = CardID::from_u8(distance + card.denote()) {
+                calc_possibility_move(&card_map_from_hands(hands), table, card_id, false)
             } else {
-                calc_possibility_move(
-                    &card_map_from_hands(hands),
-                    table,
-                    CardID::from_u8(distance + card.denote()).unwrap(),
-                    false,
-                )
+                Ratio::<u64>::zero()
             }
         }
     }
@@ -260,7 +251,7 @@ pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
     } else {
         let mut max = 0;
         for i in hands {
-            if hands[usize::try_from(*i).unwrap()] != 0 {
+            if hands[usize::try_from(*i).expect("usizeの境界内")] != 0 {
                 max = *i;
             }
         }
@@ -306,6 +297,8 @@ pub fn win_poss_attack(
     }
 }
 /// 最後の動きを決定する。(自分が最後動いて距離を決定できる場合)返り値は使うべきカード番号(`card_id`)
+/// # TODO
+/// なぜ`position`が`(i64, i64)`で受け取られるのですか? これはどちらが何を意味しているのですか?
 /// # Panics
 /// しないと思う
 pub fn last_move(
@@ -334,20 +327,17 @@ pub fn last_move(
     let mut return_value = None;
     let last = check_last(parried_quant, restcards);
     if last {
-        let can_attack = hands[usize::try_from(distance).unwrap() - 1] != Maisuu::ZERO;
+        let can_attack =
+            hands[usize::try_from(distance).expect("usizeの境界内") - 1] != Maisuu::ZERO;
         let attack_action = Action::Attack(Attack::new(
-            CardID::from_u8(u8::try_from(distance).unwrap()).unwrap(),
-            hands[usize::try_from(distance).unwrap()],
+            CardID::from_u8(u8::try_from(distance).expect("u8の境界内")).expect("CardIDの境界内"),
+            hands[usize::try_from(distance).expect("usizeの境界内")],
         ));
         if can_attack {
-            let possibility = win_poss_attack(
-                restcards,
-                &hands_from_card_map(hands),
-                table,
-                attack_action,
-            );
+            let possibility =
+                win_poss_attack(restcards, &hands_from_card_map(hands), table, attack_action);
             if possibility == Ratio::one() {
-                return_value = Some(u64::try_from(distance).unwrap());
+                return_value = Some(u64::try_from(distance).expect("u64の境界内"));
             }
         }
         return_value

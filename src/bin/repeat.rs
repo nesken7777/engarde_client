@@ -1,6 +1,9 @@
 //! 繰り返し学習させるアプリ
 
-use std::{fmt::{Display, Formatter, Result}, process::Command};
+use std::{
+    fmt::{Display, Formatter, Result},
+    process::Command,
+};
 
 use clap::{Parser, ValueEnum};
 use engarde_client::print;
@@ -47,7 +50,7 @@ fn q_learning_loop(final_loop: usize, loop_count: usize, max_score: u32) {
             .arg("-l")
             .arg(loop_count.to_string())
             .spawn()
-            .unwrap();
+            .expect("q-learning.exe起動失敗");
         let mut client1 = Command::new(".\\q-learning.exe")
             .arg("-m")
             .arg("train")
@@ -56,16 +59,16 @@ fn q_learning_loop(final_loop: usize, loop_count: usize, max_score: u32) {
             .arg("-l")
             .arg(loop_count.to_string())
             .spawn()
-            .unwrap();
+            .expect("q-learning.exe起動失敗");
         for _ in 0..loop_count {
             let mut server = Command::new(".\\engarde_server.exe")
                 .arg(max_score.to_string())
                 .spawn()
-                .unwrap();
-            server.wait().unwrap();
+                .expect("engarde_server.exe起動失敗");
+            server.wait().expect("engarde_serverクラッシュ");
         }
-        client0.wait().unwrap();
-        client1.wait().unwrap();
+        client0.wait().expect("q-learning.exeクラッシュ");
+        client1.wait().expect("q-learning.exeクラッシュ");
     }
 }
 
@@ -74,22 +77,22 @@ fn dqn_loop(final_loop: usize, loop_count: usize, max_score: u32) {
         let mut server = Command::new(".\\engarde_server.exe")
             .arg(max_score.to_string())
             .spawn()
-            .unwrap();
+            .expect("engarde_server.exe起動失敗");
         let mut client0 = Command::new(".\\dqn.exe")
             .arg("-m")
             .arg("train")
             .spawn()
-            .unwrap();
+            .expect("dqn.exe起動失敗");
         let mut client1 = Command::new(".\\dqn.exe")
             .arg("-m")
             .arg("train")
             .spawn()
-            .unwrap();
+            .expect("dqn.exe起動失敗");
 
-        server.wait().unwrap();
-        client0.wait().unwrap();
-        client1.wait().unwrap();
-        print(format!("{i}").as_str()).unwrap();
+        server.wait().expect("engarde_serverクラッシュ");
+        client0.wait().expect("dqn.exeクラッシュ");
+        client1.wait().expect("dqn.exeクラッシュ");
+        print(format!("{i}")).expect("出力に失敗");
     }
 }
 

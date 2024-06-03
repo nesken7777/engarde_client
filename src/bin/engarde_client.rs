@@ -65,7 +65,8 @@ impl From<io::Error> for CantAttack {
 fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, CantAttack> {
     use CantAttack::Lack;
     let card = CardID::from_u8(board.distance_between_enemy()).ok_or(Lack)?;
-    let have = u8::try_from(player.hand.iter().filter(|&&x| x == card).count()).unwrap();
+    let have =
+        u8::try_from(player.hand.iter().filter(|&&x| x == card).count()).expect("u8の境界内");
     if have == 0 {
         return Err(Lack);
     }
@@ -84,7 +85,7 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
     };
     Ok(Action::Attack(Attack::new(
         card,
-        Maisuu::new(quantity).unwrap(),
+        Maisuu::from_u8(quantity).expect("Maisuuの境界内"),
     )))
 }
 

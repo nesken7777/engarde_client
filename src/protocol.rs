@@ -341,8 +341,8 @@ pub struct PlayedMoveMent {
 impl PlayedMoveMent {
     fn from_deserialized(json: &PlayedMoveMentJson) -> Self {
         Self {
-            play_card: CardID::from_u8(json.play_card()).unwrap(),
-            direction: Direction::from_str(json.direction()).unwrap(),
+            play_card: CardID::from_u8(json.play_card()).expect("CardIDの境界内"),
+            direction: Direction::from_str(json.direction()).expect("正しい方向"),
         }
     }
 
@@ -399,8 +399,8 @@ pub struct PlayedAttack {
 impl PlayedAttack {
     fn from_deserialized(json: &PlayedAttackJson) -> Self {
         Self {
-            play_card: CardID::from_u8(json.play_card()).unwrap(),
-            num_of_card: Maisuu::new(json.num_of_card()).unwrap(),
+            play_card: CardID::from_u8(json.play_card()).expect("CardIDの境界内"),
+            num_of_card: Maisuu::from_u8(json.num_of_card()).expect("Maisuuの境界内"),
         }
     }
 

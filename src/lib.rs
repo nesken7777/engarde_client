@@ -60,8 +60,24 @@ impl CardID {
         }
     }
 
-    /// `u8`から`CardId`を作成します
+    /// `u8`から`CardID`を作成します
     pub const fn from_u8(n: u8) -> Option<CardID> {
+        use CardID::{Five, Four, One, Three, Two};
+        match n {
+            n @ (1..=5) => Some(match n {
+                1 => One,
+                2 => Two,
+                3 => Three,
+                4 => Four,
+                5 => Five,
+                _ => unreachable!(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// `usize`から`CardID`を作成します
+    pub const fn from_usize(n: usize) -> Option<CardID> {
         use CardID::{Five, Four, One, Three, Two};
         match n {
             n @ (1..=5) => Some(match n {
@@ -101,7 +117,14 @@ impl Maisuu {
     pub const FIVE: Maisuu = Maisuu(5);
     /// カード枚数を作成します。
     /// 0～5の値までが許容され、それ以外は`None`となります。
-    pub fn new(n: u8) -> Option<Maisuu> {
+    pub fn from_u8(n: u8) -> Option<Maisuu> {
+        (n <= 5).then_some(Maisuu(n))
+    }
+
+    /// `usize`からカード枚数を作成します。
+    /// /// 0～5の値までが許容され、それ以外は`None`となります。
+    pub fn from_usize(n: usize) -> Option<Maisuu> {
+        let n: u8 = n.try_into().ok()?;
         (n <= 5).then_some(Maisuu(n))
     }
 
@@ -126,7 +149,7 @@ impl Maisuu {
     /// `Maisuu::MAX`を超える場合、`None`となります。
     pub fn checked_add(&self, other: Maisuu) -> Option<Maisuu> {
         let n = self.0 + other.0;
-        Maisuu::new(n)
+        Maisuu::from_u8(n)
     }
 
     /// カード枚数同士を足します。
@@ -204,14 +227,12 @@ pub fn get_id(bufreader: &mut BufReader<TcpStream>) -> io::Result<PlayerID> {
 /// サーバーへ情報を送ります。
 /// # Errors
 /// 何らかのの問題で通信エラーが発生した場合エラーを返します。
-/// # Panics
-/// なぜかシリアライズに失敗した場合にパニックします。
 pub fn send_info<W, T>(writer: &mut BufWriter<W>, info: &T) -> io::Result<()>
 where
     W: Write,
     T: Serialize,
 {
-    let string = format!("{}\r\n", serde_json::to_string(info).unwrap());
+    let string = format!("{}\r\n", serde_json::to_string(info)?);
     writer.write_all(string.as_bytes())?;
     writer.flush()?;
     Ok(())
@@ -242,7 +263,7 @@ impl RestCards {
     /// スライスの長さが5以外の場合パニックします。
     pub fn from_slice(slice: &[Maisuu]) -> RestCards {
         RestCards {
-            cards: slice.try_into().unwrap(),
+            cards: slice.try_into().expect("スライスの長さが5ではない"),
         }
     }
     /// `action`から残りのカード枚数を減らします。
@@ -401,18 +422,18 @@ impl Action {
     pub fn from_index(idx: usize) -> Action {
         match idx {
             x @ 0..=4 => Action::Move(Movement {
-                card: CardID::from_u8(u8::try_from(x + 1).unwrap()).unwrap(),
+                card: CardID::from_usize(x + 1).expect("CardIDの境界内"),
                 direction: Direction::Forward,
             }),
             x @ 5..=9 => Action::Move(Movement {
-                card: CardID::from_u8(u8::try_from(x - 5 + 1).unwrap()).unwrap(),
+                card: CardID::from_usize(x - 5 + 1).expect("CardIDの境界内"),
                 direction: Direction::Back,
             }),
             x @ 10..=34 => {
                 let x = x - 10;
                 Action::Attack(Attack {
-                    card: CardID::from_u8(u8::try_from(x / 5 + 1).unwrap()).unwrap(),
-                    quantity: Maisuu::new(u8::try_from(x % 5 + 1).unwrap()).unwrap(),
+                    card: CardID::from_usize(x / 5 + 1).expect("CardIDの境界内"),
+                    quantity: Maisuu::from_usize(x % 5 + 1).expect("Maisuuの境界内"),
                 })
             }
             _ => unreachable!(),
@@ -443,7 +464,7 @@ impl From<[f32; 35]> for Action {
             .enumerate()
             .max_by(|&(_, x), &(_, y)| x.total_cmp(&y))
             .map(|(i, _)| i)
-            .unwrap();
+            .expect("必ず最大値が存在する");
         Action::from_index(idx)
     }
 }

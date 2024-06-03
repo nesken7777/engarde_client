@@ -123,7 +123,7 @@ impl State for MyState {
             (have > 0).then(|| {
                 Action::Attack(Attack {
                     card,
-                    quantity: Maisuu::new(u8::try_from(have).unwrap()).unwrap(),
+                    quantity: Maisuu::from_usize(have).expect("Maisuuの境界内"),
                 })
             })
         }
@@ -246,7 +246,7 @@ impl From<MyState> for [f32; 16] {
         ]
         .concat()
         .try_into()
-        .unwrap()
+        .expect("長さが16")
     }
 }
 
@@ -352,6 +352,6 @@ impl Agent<MyState> for MyAgent {
             }
             Ok(())
         };
-        take_action_result().unwrap();
+        take_action_result().expect("正しい挙動");
     }
 }

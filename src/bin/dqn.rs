@@ -25,7 +25,8 @@ use engarde_client::{
     get_id,
     protocol::{BoardInfo, Messages, PlayerName},
     read_stream, send_info,
-    states::{MyAgent, MyState}, Action,
+    states::{MyAgent, MyState},
+    Action,
 };
 
 struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
@@ -61,7 +62,7 @@ impl ExplorationStrategy<MyState> for BestExplorationDqn {
         let action_index = available_actions
             .into_iter()
             .max_by(|(_, value), (_, other_value)| value.total_cmp(other_value))
-            .unwrap()
+            .expect("必ず最大値がある")
             .0;
 
         // そのインデックスでアクションに変換
