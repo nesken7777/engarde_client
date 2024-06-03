@@ -1,12 +1,10 @@
-#![allow(clippy::all)]
-#![allow(missing_docs)]
-#![allow(clippy::absolute_paths)]
-#![allow(dead_code)]
-
 //! 通信プロトコル
 
+use std::fmt::{self, Formatter};
+use std::str::FromStr;
 use std::{error::Error, fmt::Display};
 
+use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::Value;
@@ -14,22 +12,27 @@ use serde_with::skip_serializing_none;
 
 use crate::errors::Errors;
 
-use crate::states::{Attack, Direction, Movement};
-use crate::{CardID, Maisuu};
+use crate::{Action, Attack, CardID, Direction, Maisuu, Movement};
 
+/// サーバーから送られてくるプレイヤーIDを示します。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum PlayerID {
+    /// プレイヤー0
     Zero,
+    /// プレイヤー1
     One,
 }
 
 impl PlayerID {
+    /// プレイヤーIDを`u8`上の表現にします。
     pub fn denote(&self) -> u8 {
         match self {
             PlayerID::Zero => 0,
             PlayerID::One => 1,
         }
     }
+
+    /// `u8`からプレイヤーIDを生成します。
     pub fn from_u8(id: u8) -> Option<PlayerID> {
         match id {
             0 => Some(PlayerID::Zero),
@@ -46,39 +49,39 @@ impl<'de> Deserialize<'de> for PlayerID {
     {
         struct MyEnumVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for MyEnumVisitor {
+        impl<'de> Visitor<'de> for MyEnumVisitor {
             type Value = PlayerID;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
                 formatter.write_str("0 or 1 or Zero or One")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: de::Error,
             {
                 match v.trim() {
                     "0" | "Zero" => Ok(PlayerID::Zero),
                     "1" | "One" => Ok(PlayerID::One),
-                    _ => Err(E::invalid_value(serde::de::Unexpected::Str(v), &self)),
+                    _ => Err(E::invalid_value(Unexpected::Str(v), &self)),
                 }
             }
 
             fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: de::Error,
             {
                 self.visit_str(v.as_str())
             }
 
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
-                E: serde::de::Error,
+                E: de::Error,
             {
                 match v {
                     0 => Ok(PlayerID::Zero),
                     1 => Ok(PlayerID::One),
-                    _ => Err(E::invalid_value(serde::de::Unexpected::Unsigned(v), &self)),
+                    _ => Err(E::invalid_value(Unexpected::Unsigned(v), &self)),
                 }
             }
         }
@@ -90,11 +93,11 @@ impl<'de> Deserialize<'de> for PlayerID {
 #[derive(Deserialize, Debug)]
 struct BoardInfoJson {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(
         rename = "PlayerPosition_0",
         deserialize_with = "deserialize_number_from_string"
@@ -150,6 +153,7 @@ impl BoardInfoJson {
     }
 }
 
+/// サーバーから送られてくるボード情報を表します。
 #[derive(Debug, Clone)]
 pub struct BoardInfo {
     p0_position: u8,
@@ -172,18 +176,42 @@ impl BoardInfo {
         }
     }
 
+    /// プレイヤー0の位置を返します。
     pub fn p0_position(&self) -> u8 {
         self.p0_position
     }
 
+    /// プレイヤー1の位置を返します。
     pub fn p1_position(&self) -> u8 {
         self.p1_position
     }
 
+    /// プレイヤー間の距離を返します。
     pub fn distance_between_enemy(&self) -> u8 {
         self.p1_position - self.p0_position
     }
 
+    /// プレイヤー0の点数を返します。
+    pub fn p0_score(&self) -> u32 {
+        self.p0_score
+    }
+
+    /// プレイヤー1の点数を返します。
+    pub fn p1_score(&self) -> u32 {
+        self.p1_score
+    }
+
+    /// 山札の枚数を返します。
+    pub fn num_of_deck(&self) -> u8 {
+        self.num_of_deck
+    }
+
+    /// 現在のプレイヤーを返します。
+    pub fn current_player(&self) -> Option<PlayerID> {
+        self.current_player
+    }
+
+    /// 初期化できなくて困ったときに使います。
     pub fn new() -> Self {
         Self {
             p0_position: 0,
@@ -196,14 +224,15 @@ impl BoardInfo {
     }
 }
 
+/// サーバーから送られてくる手札の情報を表します。
 #[derive(Deserialize, Debug, Clone)]
 pub struct HandInfo {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "Hand1", deserialize_with = "deserialize_number_from_string")]
     hand1: u8,
     #[serde(rename = "Hand2", deserialize_with = "deserialize_number_from_string")]
@@ -225,6 +254,7 @@ pub struct HandInfo {
 }
 
 impl HandInfo {
+    /// ベクタに変換します。
     #[allow(clippy::similar_names)]
     pub fn to_vec(&self) -> Vec<CardID> {
         let hand1 = CardID::from_u8(self.hand1);
@@ -241,45 +271,47 @@ impl HandInfo {
     }
 }
 
+/// サーバーからの攻撃の指示を表します。
 #[derive(Deserialize, Debug)]
 pub struct DoPlay {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(
         rename = "MessageID",
         deserialize_with = "deserialize_number_from_string"
     )]
-    message_id: u8,
+    _message_id: u8,
     #[serde(rename = "Message")]
-    message: String,
+    _message: String,
 }
 
+/// サーバーが`Evaluation`を承認する際に送られる情報を表します。
 #[derive(Deserialize, Debug)]
 pub struct Accept {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "MessageID")]
-    message_id: String,
+    _message_id: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct PlayedMoveMentJson {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "MessageID")]
-    message_id: String,
+    _message_id: String,
     #[serde(
         rename = "PlayCard",
         deserialize_with = "deserialize_number_from_string"
@@ -299,6 +331,7 @@ impl PlayedMoveMentJson {
     }
 }
 
+/// 相手が動いたときにサーバーから送られてくる情報を表します。
 #[derive(Debug)]
 pub struct PlayedMoveMent {
     play_card: CardID,
@@ -313,10 +346,12 @@ impl PlayedMoveMent {
         }
     }
 
+    /// 相手が使用したカード番号を返します。
     pub fn play_card(&self) -> CardID {
         self.play_card
     }
 
+    /// 相手が動いた方向を返します。
     pub fn direction(&self) -> Direction {
         self.direction
     }
@@ -325,13 +360,13 @@ impl PlayedMoveMent {
 #[derive(Deserialize, Debug)]
 struct PlayedAttackJson {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "MessageID")]
-    message_id: String,
+    _message_id: String,
     #[serde(
         rename = "PlayCard",
         deserialize_with = "deserialize_number_from_string"
@@ -354,6 +389,7 @@ impl PlayedAttackJson {
     }
 }
 
+/// 相手が攻撃したときにサーバーから送られてくる情報を表します。
 #[derive(Debug)]
 pub struct PlayedAttack {
     play_card: CardID,
@@ -368,108 +404,143 @@ impl PlayedAttack {
         }
     }
 
+    /// 相手が使用したカード番号を返します。
     pub fn play_card(&self) -> CardID {
         self.play_card
     }
 
+    /// 相手が何枚カードを使用したかを返します。
     pub fn num_of_card(&self) -> Maisuu {
         self.num_of_card
     }
 }
 
+/// 相手が行動したときの動きもしくは攻撃のセットです。
 #[derive(Debug)]
 pub enum Played {
+    /// 相手が動いた場合こちらになります。
     MoveMent(PlayedMoveMent),
+    /// 相手が攻撃した場合こちらになります。
     Attack(PlayedAttack),
 }
 
+impl Played {
+    /// `Action`に変換します。
+    pub fn to_action(&self) -> Action {
+        match self {
+            Played::MoveMent(movement) => Action::Move(Movement {
+                card: movement.play_card(),
+                direction: movement.direction(),
+            }),
+            Played::Attack(attack) => Action::Attack(Attack {
+                card: attack.play_card(),
+                quantity: attack.num_of_card(),
+            }),
+        }
+    }
+}
+
+/// ラウンドが終了したときにサーバーから送られてくる情報を表します。
 #[derive(Deserialize, Debug)]
 pub struct RoundEnd {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(
         rename = "RWinner",
         deserialize_with = "deserialize_number_from_string"
     )]
     round_winner: i8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    score_0: u32,
+    _score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    score_1: u32,
+    _score_1: u32,
     #[serde(rename = "Message")]
-    message: String,
+    _message: String,
 }
 
 impl RoundEnd {
+    /// そのラウンドの勝者を返します。
     pub fn round_winner(&self) -> i8 {
         self.round_winner
     }
 }
 
+/// 試合全体が終了したときにサーバーから送られてくる情報を表します。
 #[derive(Deserialize, Debug)]
 pub struct GameEnd {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "Winner", deserialize_with = "deserialize_number_from_string")]
     winner: u8,
     #[serde(rename = "Score0", deserialize_with = "deserialize_number_from_string")]
-    score_0: u32,
+    _score_0: u32,
     #[serde(rename = "Score1", deserialize_with = "deserialize_number_from_string")]
-    score_1: u32,
+    _score_1: u32,
     #[serde(rename = "Message")]
-    message: String,
+    _message: String,
 }
 
 impl GameEnd {
+    /// その試合の勝者を返します。
     pub fn winner(&self) -> u8 {
         self.winner
     }
 }
 
+/// サーバーからエラーが来たときの情報を表します。
 #[derive(Deserialize, Debug)]
 #[serde(rename = "Error")]
 pub struct ServerError {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "Message")]
-    message: String,
+    _message: String,
     #[serde(rename = "MessageID")]
-    message_id: String,
+    _message_id: String,
 }
 
-///ゲーム中に繰り返し受信されるJSON達
+/// ゲーム中に繰り返し受信されるJSON達
 /// `ConnectionStart`と`NameReceived`は最初しか来ないので除外
 #[derive(Debug)]
 pub enum Messages {
+    /// ボード情報
     BoardInfo(BoardInfo),
+    /// 手札情報
     HandInfo(HandInfo),
+    /// 行動指示
     DoPlay(DoPlay),
+    /// `Evaluation`承認
     Accept(Accept),
+    /// 相手が行動
     Played(Played),
+    /// ラウンド終了
     RoundEnd(RoundEnd),
+    /// 試合全体の終了
     GameEnd(GameEnd),
+    /// サーバーからのエラー
     ServerError(ServerError),
 }
 
+/// メッセージのパースに失敗したときのエラーです。
 #[derive(Debug)]
 pub struct ParseMessageError {
     invalid_info: String,
 }
 
 impl Display for ParseMessageError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "ParseMessageError, json is {}", self.invalid_info)
     }
 }
@@ -531,24 +602,27 @@ impl Messages {
     }
 }
 
+/// 通信開始に初めに送られてくる情報です。
 #[derive(Deserialize, Debug)]
 pub struct ConnectionStart {
     #[serde(rename = "Type")]
-    typ: String,
+    _typ: String,
     #[serde(rename = "From")]
-    from: String,
+    _from: String,
     #[serde(rename = "To")]
-    to: String,
+    _to: String,
     #[serde(rename = "ClientID")]
     client_id: PlayerID,
 }
 
 impl ConnectionStart {
+    /// 自分のプレイヤーIDとなります。
     pub fn client_id(&self) -> PlayerID {
         self.client_id
     }
 }
 
+/// クライアント側から送る名前情報です。
 #[derive(Debug, Serialize)]
 pub struct PlayerName {
     #[serde(rename = "Type")]
@@ -562,6 +636,7 @@ pub struct PlayerName {
 }
 
 impl PlayerName {
+    /// 名前を作成します。
     pub fn new(name: String) -> Self {
         PlayerName {
             typ: "PlayerName",
@@ -572,16 +647,18 @@ impl PlayerName {
     }
 }
 
+/// 名前をサーバーが受け取った際に送られてきます。
 #[derive(Deserialize, Debug)]
 pub struct NameReceived {
     #[serde(rename = "Type")]
-    typ: &'static str,
+    _typ: &'static str,
     #[serde(rename = "From")]
-    from: &'static str,
+    _from: &'static str,
     #[serde(rename = "To")]
-    to: &'static str,
+    _to: &'static str,
 }
 
+/// サーバーに送る評価値のセットを表します。
 #[skip_serializing_none]
 #[derive(Debug, Serialize)]
 pub struct Evaluation {
@@ -620,6 +697,7 @@ impl Default for Evaluation {
 }
 
 impl Evaluation {
+    /// とりあえず生成したいときに使います。
     pub fn new() -> Self {
         Self {
             typ: "Evaluation",
@@ -639,6 +717,7 @@ impl Evaluation {
     }
 }
 
+/// サーバーへ送る「動き」の情報を表します。
 #[derive(Debug, Serialize)]
 pub struct PlayMovement {
     #[serde(rename = "Type")]
@@ -656,6 +735,7 @@ pub struct PlayMovement {
 }
 
 impl PlayMovement {
+    /// `Movement`から情報を作ります。
     pub fn from_info(info: Movement) -> Self {
         PlayMovement {
             typ: "Play",
@@ -668,6 +748,7 @@ impl PlayMovement {
     }
 }
 
+/// サーバーへ送る「攻撃」の情報を表します。
 #[derive(Debug, Serialize)]
 pub struct PlayAttack {
     #[serde(rename = "Type")]
@@ -685,6 +766,7 @@ pub struct PlayAttack {
 }
 
 impl PlayAttack {
+    /// `Attack`から情報を作ります。
     pub fn from_info(info: Attack) -> Self {
         Self {
             typ: "Play",

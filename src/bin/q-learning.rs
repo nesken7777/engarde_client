@@ -19,11 +19,7 @@ use rurel::{
 };
 
 use engarde_client::{
-    get_id, print,
-    protocol::{Messages, PlayerID, PlayerName},
-    read_stream, send_info,
-    states::{Action, Attack, Direction, Movement, MyAgent, MyState, RestCards},
-    CardID, Maisuu,
+    get_id, print, protocol::{Messages, PlayerID, PlayerName}, read_stream, send_info, states::{MyAgent, MyState}, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards
 };
 
 const DESERIALIZE_ERROR_MESSAGE_CARD_ID: &str = "デシリアライズ失敗:数がCardIDの範囲外";

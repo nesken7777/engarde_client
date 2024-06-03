@@ -25,7 +25,7 @@ use engarde_client::{
     get_id,
     protocol::{BoardInfo, Messages, PlayerName},
     read_stream, send_info,
-    states::{Action, MyAgent, MyState},
+    states::{MyAgent, MyState}, Action,
 };
 
 struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);

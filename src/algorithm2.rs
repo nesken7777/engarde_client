@@ -5,9 +5,7 @@ use std::ops::{Index, IndexMut};
 use num_rational::Ratio;
 
 use crate::{
-    algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable},
-    states::{Action, Attack, Direction, Movement, RestCards},
-    CardID, Maisuu,
+    algorithm::{card_map_from_hands, safe_possibility, win_poss_attack, ProbabilityTable}, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards
 };
 
 /// 指定された`card_id`のカードを使用可能かを決める構造体
@@ -188,18 +186,18 @@ pub fn should_go_2_7(
     //7の距離に行くべき状態か判断する
 
     if let Some(movement) = movement_togo7 {
-        if hands[usize::from(movement.card().denote())] != Maisuu::ZERO
+        if hands[movement.card().denote_usize()] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[usize::from(movement.card().denote())]
+            && acceptable[movement.card().denote_usize()]
         {
             return togo7;
         }
     };
     //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[usize::from(movement.card().denote())] != Maisuu::ZERO
+        if hands[movement.card().denote_usize()] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[usize::from(movement.card().denote())]
+            && acceptable[movement.card().denote_usize()]
         {
             return togo2;
         }

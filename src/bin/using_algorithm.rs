@@ -12,9 +12,7 @@ use engarde_client::{
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
     protocol::{BoardInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
-    read_stream, send_info,
-    states::{used_card, Action, Attack, Direction, Movement, RestCards},
-    CardID, Maisuu,
+    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
 };
 use rand::{seq::SliceRandom, thread_rng};
 
@@ -177,14 +175,14 @@ fn main() -> io::Result<()> {
                     Messages::DoPlay(_) => {
                         let action = act(&state);
                         send_action(&mut bufwriter, action)?;
-                        used_card(&mut state.cards, action);
+                        state.cards.used_card(action);
                     }
                     Messages::ServerError(e) => {
                         print("エラーもらった")?;
                         print(format!("{e:?}").as_str())?;
                         break;
                     }
-                    Messages::Played(played) => used_card(&mut state.cards, played.to_action()),
+                    Messages::Played(played) => state.cards.used_card(played.to_action()),
                     Messages::RoundEnd(_round_end) => {
                         print("ラウンド終わり!")?;
                         state.cards = RestCards::new();

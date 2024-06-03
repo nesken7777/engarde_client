@@ -6,8 +6,7 @@ use num_rational::Ratio;
 use num_traits::identities::{One, Zero};
 
 use crate::{
-    states::{Action, Attack, Direction, RestCards},
-    CardID, Maisuu, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8,
+    Action, Attack, CardID, Direction, Maisuu, RestCards, HANDS_DEFAULT_U64, HANDS_DEFAULT_U8
 };
 
 /// 相手の手札にカード番号`i`が`j`枚ある確率
