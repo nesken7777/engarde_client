@@ -1,3 +1,5 @@
+//! アルゴリズムによって動くクライアント
+
 use std::{
     collections::HashSet,
     hash::RandomState,

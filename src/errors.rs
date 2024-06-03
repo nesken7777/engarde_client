@@ -1,3 +1,5 @@
+//! エラー処理を楽にする用
+
 use crate::protocol::ParseMessageError;
 use std::fmt::Display;
 

@@ -1,3 +1,5 @@
+//! 繰り返し学習させるアプリ
+
 use std::{fmt::Display, process::Command};
 
 use clap::{Parser, ValueEnum};

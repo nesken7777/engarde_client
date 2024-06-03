@@ -1,3 +1,5 @@
+//! 基礎アルゴリズム集
+
 use std::iter;
 
 use num_rational::Ratio;

@@ -1,3 +1,5 @@
+//! DQNのAIクライアント
+
 use std::{
     fs::create_dir_all,
     io::{self, BufReader, BufWriter},

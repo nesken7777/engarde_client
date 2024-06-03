@@ -1,3 +1,6 @@
+//! AI用の状態・エージェント等々
+//! 正直ごちゃごちゃ入れすぎているから良くない　双依存になってる
+
 use std::{
     collections::HashSet,
     fmt::Display,

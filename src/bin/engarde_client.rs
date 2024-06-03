@@ -1,3 +1,5 @@
+//! 対話環境で遊ぶクライアント
+
 use engarde_client::{
     get_id, print,
     protocol::{BoardInfo, Evaluation, Messages, PlayerID, PlayerName},

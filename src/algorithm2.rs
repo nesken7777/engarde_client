@@ -1,3 +1,5 @@
+//! 行動アルゴリズム集
+
 use std::ops::{Index, IndexMut};
 
 use num_rational::Ratio;

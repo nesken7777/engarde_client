@@ -1,3 +1,5 @@
+//! Q学習のAIクライアント
+
 use std::{
     collections::HashMap,
     fs::OpenOptions,
