@@ -119,8 +119,8 @@ impl MyStateAlg {
     }
 }
 
-fn act(state: &MyStateAlg) -> Action {
-    let card_map = card_map_from_hands(&state.hands);
+fn act(state: &MyStateAlg) -> Option<Action> {
+    let card_map = card_map_from_hands(&state.hands)?;
     let distance = state.p1_position - state.p0_position;
     let acceptable = AcceptableNumbers::new(card_map, state.cards, distance);
     let table = ProbabilityTable::new(
@@ -134,11 +134,11 @@ fn act(state: &MyStateAlg) -> Action {
     let initial = initial_move(&card_map, distance, &acceptable).ok();
     let middle = middle_move(&state.hands, distance, state.cards, &table);
     let det = initial.or(middle);
-    det.unwrap_or({
+    Some(det.unwrap_or({
         let mut rng = thread_rng();
         let actions = state.actions();
-        actions.choose(&mut rng).copied().expect("できる行動が何一つない")
-    })
+        actions.choose(&mut rng).copied()?
+    }))
 }
 
 fn send_action(writer: &mut BufWriter<TcpStream>, action: Action) -> io::Result<()> {
@@ -173,7 +173,7 @@ fn main() -> io::Result<()> {
                     }
                     Messages::Accept(_) => (),
                     Messages::DoPlay(_) => {
-                        let action = act(&state);
+                        let action = act(&state).unwrap_or_else(|| panic!("行動決定不能"));
                         send_action(&mut bufwriter, action)?;
                         state.cards.used_card(action);
                     }

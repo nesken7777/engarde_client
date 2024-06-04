@@ -57,35 +57,34 @@ impl ProbabilityTable {
 }
 
 /// 手札からカード番号-枚数表にします。
-/// # Panics
-/// 絶対にpanicしない自信があります!
-pub fn card_map_from_hands(hands: &[CardID]) -> [Maisuu; 5] {
+/// `hands`の長さが5より大きい場合、`None`となります。
+pub fn card_map_from_hands(hands: &[CardID]) -> Option<[Maisuu; 5]> {
     use CardID::{Five, Four, One, Three, Two};
-    assert!(hands.len() <= 5);
-    [One, Two, Three, Four, Five]
+    let map = [One, Two, Three, Four, Five]
         .into_iter()
-        .map(|x| {
+        .map(|x| -> Option<Maisuu> {
             let have = hands.iter().filter(|&&y| x == y).count();
-            Maisuu::from_usize(have).expect("Maisuuの境界内")
+            Maisuu::from_usize(have)
         })
-        .collect::<Vec<_>>()
+        .collect::<Option<Vec<_>>>()?
         .try_into()
-        .expect("必ず長さが5")
+        .ok()?;
+    Some(map)
 }
 
 /// カード番号-枚数表から手札にします。
-/// # Panics
-/// 絶対にpanicしない自信があります!
-pub fn hands_from_card_map(card_map: &[Maisuu]) -> [CardID; 5] {
-    assert_eq!(card_map.len(), 5);
+pub fn hands_from_card_map(card_map: &[Maisuu]) -> Option<[CardID; 5]> {
     (0..5)
-        .flat_map(|i| {
-            iter::repeat(CardID::from_u8(i).expect("必ず1~5の範囲内"))
-                .take(card_map[usize::from(i)].denote_usize())
+        .filter_map(|i| {
+            Some(
+                iter::repeat(CardID::from_u8(i)?)
+                    .take(card_map.get(usize::from(i)).map(Maisuu::denote_usize)?),
+            )
         })
+        .flatten()
         .collect::<Vec<CardID>>()
         .try_into()
-        .expect("必ず長さが5")
+        .ok()
 }
 
 fn permutation(n: u64, r: u64) -> u64 {
@@ -132,10 +131,9 @@ impl<T: AsRef<[CardID]>> HandsUtil for T {
     }
 }
 
-/// その行動を行った時に安全である確率を求める。distanceは相手との距離、unvisibleは墓地にあるカード枚数、handsは自分の手札、tableは相手が指定されたカードを何枚もっているか保持している構造体、actionは何かしらのアクションを指定する。
+/// その行動を行った時に安全である確率を求める。`distance`は相手との距離、`unvisible`は墓地にあるカード枚数、`hands`は自分の手札、`table`は相手が指定されたカードを何枚もっているか保持している構造体、`action`は何かしらのアクションを指定する。
 /// 返り値はそのアクションを行ったときの安全な確率。
-/// # Panics
-/// 知らないです
+/// `None`の場合、`hands`に異常があります。
 pub fn safe_possibility(
     distance: u8,
     // カード番号がiのやつが墓地に何枚あるかを示す
@@ -144,14 +142,18 @@ pub fn safe_possibility(
     hands: &[CardID],
     table: &ProbabilityTable,
     action: Action,
-) -> Ratio<u64> {
+) -> Option<Ratio<u64>> {
     match action {
         Action::Attack(attack) => {
             let i: usize = attack.card().denote().into();
             if rest_cards[i] <= hands.count_cards(attack.card()) {
-                Ratio::<u64>::one()
+                Some(Ratio::<u64>::one())
             } else {
-                calc_possibility_attack(&card_map_from_hands(hands), table, attack.card())
+                Some(calc_possibility_attack(
+                    &card_map_from_hands(hands)?,
+                    table,
+                    attack.card(),
+                ))
             }
         }
         Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
@@ -167,22 +169,32 @@ pub fn safe_possibility(
                     Maisuu::ZERO
                 }))
             {
-                Ratio::<u64>::one()
+                Some(Ratio::<u64>::one())
             } else if let Some(card_id) = CardID::from_u8(distance - card.denote()) {
-                calc_possibility_move(&card_map_from_hands(hands), table, card_id, dup)
+                Some(calc_possibility_move(
+                    &card_map_from_hands(hands)?,
+                    table,
+                    card_id,
+                    dup,
+                ))
             } else {
-                Ratio::<u64>::zero()
+                Some(Ratio::<u64>::zero())
             }
         }
         Action::Move(movement) => {
             let card = movement.card();
             let i: usize = card.denote().into();
             if rest_cards[i] <= hands.count_cards(card) {
-                Ratio::<u64>::one()
+                Some(Ratio::<u64>::one())
             } else if let Some(card_id) = CardID::from_u8(distance + card.denote()) {
-                calc_possibility_move(&card_map_from_hands(hands), table, card_id, false)
+                Some(calc_possibility_move(
+                    &card_map_from_hands(hands)?,
+                    table,
+                    card_id,
+                    false,
+                ))
             } else {
-                Ratio::<u64>::zero()
+                Some(Ratio::<u64>::zero())
             }
         }
     }
@@ -244,6 +256,7 @@ fn calc_possibility_move(
 /// ゲームが始まって最初の動きを決定する。基本的に相手と交戦しない限り最も大きいカードを使う。返り値は使うべきカード番号(`card_id`)
 /// # Panics
 /// 起きてから考える
+/// すみませんこのコード何してんのか分かりません！！！！！
 pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
     // 11よりも距離が大きい場合はsafe_possibilityまたはaiによる処理に任せる
     if distance < 11 {
@@ -258,7 +271,9 @@ pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
         Some(max + 1)
     }
 }
+
 /// 攻撃したときに勝てる確率
+///`None`の場合、`hands`に異常があります。
 pub fn win_poss_attack(
     // カード番号がiのやつが墓地に何枚あるかを示す
     rest_cards: RestCards,
@@ -266,7 +281,7 @@ pub fn win_poss_attack(
     hands: &[CardID],
     table: &ProbabilityTable,
     action: Action,
-) -> Ratio<u64> {
+) -> Option<Ratio<u64>> {
     fn calc_win_possibility(
         hands: &[Maisuu],
         table: &ProbabilityTable,
@@ -289,11 +304,13 @@ pub fn win_poss_attack(
         Action::Attack(attack) => {
             let i: usize = attack.card().denote().into();
             if rest_cards[i] < hands.count_cards(attack.card()) {
-                return Ratio::<u64>::one();
+                return Some(Ratio::<u64>::one());
             }
-            calc_win_possibility(&card_map_from_hands(hands), table, attack.card())
+            let win_possibility =
+                calc_win_possibility(&card_map_from_hands(hands)?, table, attack.card());
+            Some(win_possibility)
         }
-        Action::Move(_) => Ratio::<u64>::zero(),
+        Action::Move(_) => Some(Ratio::<u64>::zero()),
     }
 }
 /// 最後の動きを決定する。(自分が最後動いて距離を決定できる場合)返り値は使うべきカード番号(`card_id`)
@@ -334,8 +351,12 @@ pub fn last_move(
             hands[usize::try_from(distance).expect("usizeの境界内")],
         ));
         if can_attack {
-            let possibility =
-                win_poss_attack(restcards, &hands_from_card_map(hands), table, attack_action);
+            let possibility = win_poss_attack(
+                restcards,
+                &hands_from_card_map(hands)?,
+                table,
+                attack_action,
+            )?;
             if possibility == Ratio::one() {
                 return_value = Some(u64::try_from(distance).expect("u64の境界内"));
             }

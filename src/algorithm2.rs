@@ -220,21 +220,24 @@ pub fn middle_move(
     rest: RestCards,
     table: &ProbabilityTable,
 ) -> Option<Action> {
-    let att_action = (distance <= 5).then(|| {
-        Action::Attack(Attack::new(
-            CardID::from_u8(distance).expect("CardIDの境界内"),
-            card_map_from_hands(hands)[usize::from(distance - 1)],
-        ))
-    });
+    let att_action = (distance <= 5)
+        .then(|| -> Option<Action> {
+            Some(Action::Attack(Attack::new(
+                CardID::from_u8(distance).expect("CardIDの境界内"),
+                card_map_from_hands(hands)?[usize::from(distance - 1)],
+            )))
+        })
+        .flatten();
     //優先度高い
-    let att_action = att_action.filter(|&att_action| {
-        win_poss_attack(rest, hands, table, att_action) >= Ratio::from_integer(3) / 4
+    let att_action = att_action.and_then(|att_action| {
+        (win_poss_attack(rest, hands, table, att_action)? >= Ratio::from_integer(3) / 4)
+            .then_some(att_action)
     });
 
-    let mov_action =
-        should_go_2_7(card_map_from_hands(hands), distance, rest, table).filter(|&mov_action| {
-            safe_possibility(distance, rest, hands, table, mov_action) >= Ratio::from_integer(3) / 4
-        });
+    let mov_action = should_go_2_7(card_map_from_hands(hands)?, distance, rest, table)?;
+    let mov_action = (safe_possibility(distance, rest, hands, table, mov_action)?
+        >= Ratio::from_integer(3) / 4)
+        .then_some(mov_action);
 
     att_action.or(mov_action)
 }
