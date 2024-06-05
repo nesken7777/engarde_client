@@ -145,7 +145,7 @@ pub fn safe_possibility(
 ) -> Option<Ratio<u64>> {
     match action {
         Action::Attack(attack) => {
-            let i: usize = attack.card().denote().into();
+            let i: usize = attack.card().denote_usize() - 1;
             if rest_cards[i] <= hands.count_cards(attack.card()) {
                 Some(Ratio::<u64>::one())
             } else {
@@ -158,7 +158,7 @@ pub fn safe_possibility(
         }
         Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
             let card = movement.card();
-            let i = card.denote_usize();
+            let i = card.denote_usize() - 1;
             // 例:手持ちdistのカードがn枚、相手と自分の距離がdist*2のとき、1枚使ったときにn-1枚でアタックされたらパリーできる。
             // そのような、相手がn-1枚以下を持っているような確率の総和
             let dup = check_twice(distance, card.denote());
@@ -183,7 +183,7 @@ pub fn safe_possibility(
         }
         Action::Move(movement) => {
             let card = movement.card();
-            let i: usize = card.denote().into();
+            let i: usize = card.denote_usize() - 1;
             if rest_cards[i] <= hands.count_cards(card) {
                 Some(Ratio::<u64>::one())
             } else if let Some(card_id) = CardID::from_u8(distance + card.denote()) {
@@ -202,7 +202,7 @@ pub fn safe_possibility(
 
 //勝負したい距離につめるためにその距離の手札を使わなければいけないかどうか
 fn check_twice(distance: u8, i: u8) -> bool {
-    distance - (i * 2) == 0
+    distance.saturating_sub(i * 2) == 0
 }
 
 //アタックするとき、相手にパリーされても安全な確率。兼相手が自分の枚数以下を持っている確率
@@ -216,7 +216,7 @@ fn calc_possibility_attack(
     [Maisuu::ZERO, Maisuu::ONE, Maisuu::TWO, Maisuu::SOKUSHI]
         .iter()
         .map(|&enemy_quant| {
-            if hands[usize::from(card_num.denote())] >= enemy_quant {
+            if hands[card_num.denote_usize() - 1] >= enemy_quant {
                 table.access(card_num, enemy_quant)
             } else {
                 Ratio::<u64>::zero()
@@ -234,7 +234,7 @@ fn calc_possibility_move(
     [Maisuu::ONE, Maisuu::TWO, Maisuu::SOKUSHI]
         .iter()
         .map(|&i| {
-            if hands[usize::from(card_num.denote())].saturating_sub(if dup {
+            if hands[card_num.denote_usize() - 1].saturating_sub(if dup {
                 Maisuu::ONE
             } else {
                 Maisuu::ZERO
