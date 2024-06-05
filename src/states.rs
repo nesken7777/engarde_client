@@ -6,14 +6,19 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter},
     net::TcpStream,
+    ops::Mul,
 };
 
+use num_rational::Ratio;
+use num_traits::{ToPrimitive, Zero};
 use rurel::mdp::{Agent, State};
 
 use crate::{
+    algorithm::{safe_possibility, ProbabilityTable},
     print,
     protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID},
     read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
+    HANDS_DEFAULT_U8,
 };
 
 /// Stateは、結果状態だけからその評価と次できる行動のリストを与える。
@@ -108,14 +113,42 @@ impl MyState {
             PlayerID::One => self.p0_score,
         }
     }
+
+    fn calc_dist(&self) -> u8 {
+        self.p1_position - self.p0_position
+    }
+
+    fn calc_num_of_deck(&self) -> u8 {
+        self.rest_cards().iter().map(Maisuu::denote).sum::<u8>()
+            - u8::try_from(self.hands.len()).expect("いけるって")
+            - HANDS_DEFAULT_U8
+    }
 }
 
 impl State for MyState {
     type A = Action;
     #[allow(clippy::float_arithmetic)]
     fn reward(&self) -> f64 {
-        (f64::from(self.my_score()) * 200.0).powi(2)
-            - (f64::from(self.enemy_score()) * 200.0).powi(2)
+        let actions = self.actions();
+        let a = actions
+            .iter()
+            .map(|&action| {
+                safe_possibility(
+                    self.calc_dist(),
+                    self.rest_cards(),
+                    self.hands(),
+                    &ProbabilityTable::new(self.calc_num_of_deck(), &self.rest_cards()),
+                    action,
+                )
+            })
+            .sum::<Option<Ratio<u64>>>()
+            .unwrap_or(Ratio::<u64>::zero())
+            .to_f64()
+            .expect("なんで")
+            .mul(200.0)
+            .powi(2);
+        let b = (f64::from(self.my_score())).powi(2) - (f64::from(self.enemy_score())).powi(2);
+        a + b
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {

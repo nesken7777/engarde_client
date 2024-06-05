@@ -86,7 +86,7 @@ fn files_name(id: u8) -> (String, String, String, String, String, String) {
 }
 
 fn dqn_train() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(1.0, 0.2);
+    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.999, 0.2);
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
@@ -191,7 +191,7 @@ fn dqn_train() -> io::Result<()> {
 }
 
 fn dqn_eval() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.99, 0.2);
+    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.999, 0.2);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
