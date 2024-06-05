@@ -253,25 +253,6 @@ fn calc_possibility_move(
 //     cards: u64,
 // }
 
-/// ゲームが始まって最初の動きを決定する。基本的に相手と交戦しない限り最も大きいカードを使う。返り値は使うべきカード番号(`card_id`)
-/// # Panics
-/// 起きてから考える
-/// すみませんこのコード何してんのか分かりません！！！！！
-pub fn initial_move(distance: u64, hands: &[u64]) -> Option<u64> {
-    // 11よりも距離が大きい場合はsafe_possibilityまたはaiによる処理に任せる
-    if distance < 11 {
-        None
-    } else {
-        let mut max = 0;
-        for i in hands {
-            if hands[usize::try_from(*i).expect("usizeの境界内")] != 0 {
-                max = *i;
-            }
-        }
-        Some(max + 1)
-    }
-}
-
 /// 攻撃したときに勝てる確率
 ///`None`の場合、`hands`に異常があります。
 pub fn win_poss_attack(
