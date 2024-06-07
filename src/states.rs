@@ -353,7 +353,7 @@ impl Agent<MyState> for MyAgent {
                         }
                         ServerError(e) => {
                             print("エラーもらった")?;
-                            print(format!("{e:?}").as_str())?;
+                            print(format!("{e:?}"))?;
                             break;
                         }
                         Played(played) => {

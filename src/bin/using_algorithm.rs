@@ -179,7 +179,7 @@ fn main() -> io::Result<()> {
                     }
                     Messages::ServerError(e) => {
                         print("エラーもらった")?;
-                        print(format!("{e:?}").as_str())?;
+                        print(format!("{e:?}"))?;
                         break;
                     }
                     Messages::Played(played) => state.cards.used_card(played.to_action()),
@@ -193,7 +193,7 @@ fn main() -> io::Result<()> {
                 },
                 Err(e) => {
                     print("JSON解析できなかった")?;
-                    print(format!("{e}").as_str())?;
+                    print(format!("{e}"))?;
                 }
             }
         }

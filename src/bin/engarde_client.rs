@@ -90,8 +90,8 @@ fn ask_attack(player: &PlayerProperty, board: &BoardInfo) -> Result<Action, Cant
 }
 
 fn ask_action(player: &PlayerProperty, board: &BoardInfo) -> io::Result<Action> {
-    print(format!("p0: {}, p1: {}", board.p0_position(), board.p1_position()).as_str())?;
-    print(format!("手札:{:?}", player.hand).as_str())?;
+    print(format!("p0: {}, p1: {}", board.p0_position(), board.p1_position()))?;
+    print(format!("手札:{:?}", player.hand))?;
     loop {
         print("どっちのアクションにする?")?;
         let string = read_keyboard()?;
@@ -202,7 +202,7 @@ fn main() -> io::Result<()> {
                 },
                 Err(e) => {
                     print("JSON解析できなかった")?;
-                    print(format!("{e}").as_str())?;
+                    print(format!("{e}"))?;
                 }
             }
         }
