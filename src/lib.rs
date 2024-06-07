@@ -195,7 +195,7 @@ pub const HANDS_DEFAULT_U64: u64 = 5;
 /// 何かの問題で出力に失敗したときエラーを返します。
 pub fn print<S: AsRef<str>>(string: S) -> io::Result<()> {
     fn print_internal(string: &str) -> io::Result<()> {
-        let mut stdout = stdout();
+        let mut stdout = stdout().lock();
         stdout.write_all(string.as_bytes())?;
         stdout.write_all(b"\r\n")?;
         stdout.flush()
