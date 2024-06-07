@@ -84,3 +84,7 @@ unwrap_in_result = "warn"
 use_debug = "warn"
 verbose_file_reads = "warn"
 unwrap_used  = "deny"
+
+[profile.release]
+overflow-checks = true
+opt-level = 3
