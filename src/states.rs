@@ -340,6 +340,8 @@ impl Agent<MyState> for MyAgent {
                         BoardInfo(board_info) => {
                             (self.state.p0_position, self.state.p1_position) =
                                 (board_info.p0_position(), board_info.p1_position());
+                            (self.state.p0_score, self.state.p1_score) =
+                                (board_info.p0_score(), board_info.p1_score());
                         }
                         HandInfo(hand_info) => {
                             let hand_vec = hand_info.to_vec();
