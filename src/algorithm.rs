@@ -194,7 +194,7 @@ pub fn safe_possibility(
                     false,
                 ))
             } else {
-                Some(Ratio::<u64>::zero())
+                Some(Ratio::<u64>::one())
             }
         }
     }
