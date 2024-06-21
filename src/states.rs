@@ -9,6 +9,7 @@ use std::{
     ops::Mul,
 };
 
+use apply::Also;
 use num_rational::Ratio;
 use num_traits::{ToPrimitive, Zero};
 use rurel::mdp::{Agent, State};
@@ -247,12 +248,12 @@ impl State for MyState {
 impl From<MyState> for [f32; 16] {
     fn from(value: MyState) -> Self {
         let id = vec![f32::from(value.my_id.denote())];
-        let mut hands = value
+        let hands = value
             .hands
             .into_iter()
             .map(|x| f32::from(x.denote()))
-            .collect::<Vec<f32>>();
-        hands.resize(5, 0.0);
+            .collect::<Vec<f32>>()
+            .also(|hands| hands.resize(5, 0.0));
         let cards = value
             .cards
             .iter()

@@ -4,6 +4,7 @@ use std::fmt::{self, Formatter};
 use std::str::FromStr;
 use std::{error::Error, fmt::Display};
 
+use apply::Also;
 use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
@@ -262,12 +263,11 @@ impl HandInfo {
         let hand3 = CardID::from_u8(self.hand3);
         let hand4 = (|| CardID::from_u8(self.hand4?))();
         let hand5 = (|| CardID::from_u8(self.hand5?))();
-        let mut hands = vec![hand1, hand2, hand3, hand4, hand5]
+        vec![hand1, hand2, hand3, hand4, hand5]
             .into_iter()
             .flatten()
-            .collect::<Vec<CardID>>();
-        hands.sort();
-        hands
+            .collect::<Vec<CardID>>()
+            .also(|hands| hands.sort())
     }
 }
 

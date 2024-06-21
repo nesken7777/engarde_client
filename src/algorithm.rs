@@ -322,27 +322,20 @@ pub fn last_move(
     //     reachable_vec
     // }
     let distance = position.0 - position.1;
-    let mut return_value = None;
-    let last = check_last(parried_quant, restcards);
-    if last {
-        let can_attack =
-            hands[usize::try_from(distance).expect("usizeの境界内") - 1] != Maisuu::ZERO;
+    if check_last(parried_quant, restcards)
+        && hands[usize::try_from(distance).expect("usizeの境界内") - 1] != Maisuu::ZERO
+    {
         let attack_action = Action::Attack(Attack::new(
             CardID::from_u8(u8::try_from(distance).expect("u8の境界内")).expect("CardIDの境界内"),
             hands[usize::try_from(distance).expect("usizeの境界内")],
         ));
-        if can_attack {
-            let possibility = win_poss_attack(
-                restcards,
-                &hands_from_card_map(hands)?,
-                table,
-                attack_action,
-            )?;
-            if possibility == Ratio::one() {
-                return_value = Some(u64::try_from(distance).expect("u64の境界内"));
-            }
-        }
-        return_value
+        let possibility = win_poss_attack(
+            restcards,
+            &hands_from_card_map(hands)?,
+            table,
+            attack_action,
+        )?;
+        (possibility==Ratio::one()).then(|| u64::try_from(distance).expect("u64の教会内"))
     } else {
         None
     }

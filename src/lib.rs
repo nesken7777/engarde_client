@@ -8,6 +8,7 @@ use std::{
     str::FromStr,
 };
 
+use apply::Also;
 use protocol::{ConnectionStart, PlayerID};
 use serde::{Deserialize, Serialize};
 
@@ -451,9 +452,7 @@ impl Action {
 
 impl From<Action> for [f32; 35] {
     fn from(value: Action) -> Self {
-        let mut arr = [0_f32; 35];
-        arr[value.as_index()] = 1.0;
-        arr
+        [0_f32; 35].also(|arr| arr[value.as_index()] = 1.0)
     }
 }
 
