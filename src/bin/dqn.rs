@@ -6,6 +6,7 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
+use apply::Also;
 use clap::{Parser, ValueEnum};
 use dfdx::{
     nn::modules::{Linear, ReLU},
@@ -113,8 +114,7 @@ fn dqn_train() -> io::Result<()> {
             Ok(_) | Err(_) => {}
         }
     };
-    let mut hand_vec = hand_info.to_vec();
-    hand_vec.sort();
+    let hand_vec = hand_info.to_vec().also(|hand_vec| hand_vec.sort());
     // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,
@@ -219,8 +219,7 @@ fn dqn_eval() -> io::Result<()> {
             Ok(_) | Err(_) => {}
         }
     };
-    let mut hand_vec = hand_info.to_vec();
-    hand_vec.sort();
+    let hand_vec = hand_info.to_vec().also(|hand_vec| hand_vec.sort());
     // AI用エージェント作成
     let mut agent = MyAgent::new(
         id,
