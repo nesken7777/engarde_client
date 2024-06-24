@@ -13,6 +13,7 @@ use dfdx::{
     shapes::Const,
     tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
 };
+use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
@@ -29,6 +30,57 @@ use engarde_client::{
     states::{MyAgent, MyState},
     Action,
 };
+
+struct EpsilonGreedy(DQNAgentTrainer<MyState, 16, 35, 32>);
+
+impl EpsilonGreedy {
+    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
+        EpsilonGreedy(trainer)
+    }
+}
+
+impl ExplorationStrategy<MyState> for EpsilonGreedy {
+    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        let mut rng = thread_rng();
+        let random = rng.gen::<u64>();
+
+        if random < (u64::MAX / 2) {
+            agent.pick_random_action()
+        } else {
+            let current_state = agent.current_state();
+
+            // 行動していいアクション"のインデックス"のリストを取得
+            let available_action_indicies = current_state
+                .actions()
+                .into_iter()
+                .map(|action| action.as_index())
+                .collect::<Vec<usize>>();
+            // 評価値のリストを取得
+            let expected_values = self.0.expected_value(current_state);
+
+            // 有効なアクションと評価値のリストを取得
+            let available_actions = expected_values
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| available_action_indicies.contains(i))
+                .collect::<Vec<(usize, f32)>>();
+
+            // 評価値が最大のインデックスを取得
+            let action_index = available_actions
+                .into_iter()
+                .max_by(|(_, value), (_, other_value)| value.total_cmp(other_value))
+                .expect("必ず最大値がある")
+                .0;
+
+            // そのインデックスでアクションに変換
+            let action = Action::from_index(action_index);
+
+            // 行動
+            agent.take_action(&action);
+            action
+        }
+    }
+}
 
 struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
 
