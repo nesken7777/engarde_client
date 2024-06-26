@@ -38,7 +38,7 @@ impl BestExploration {
 }
 
 impl ExplorationStrategy<MyState> for BestExploration {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         match self.0.best_action(agent.current_state()) {
             None => agent.pick_random_action(),
             Some(action) => {
@@ -277,7 +277,7 @@ fn q_train(loop_count: usize, id: u8) -> io::Result<()> {
             &mut agent,
             &QLearning::new(0.2, 0.7, 0.0),
             &mut SinkStates {},
-            &RandomExploration,
+            &mut RandomExploration,
         );
         learned_values = trainer.export_learned_values();
     }
@@ -358,7 +358,7 @@ fn q_eval(id: u8) -> io::Result<()> {
         &mut agent,
         &QLearning::new(0.2, 0.7, 0.0),
         &mut SinkStates {},
-        &BestExploration::new(trainer2),
+        &mut BestExploration::new(trainer2),
     );
 
     Ok(())

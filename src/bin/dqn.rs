@@ -17,10 +17,7 @@ use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{
-        explore::{ExplorationStrategy, RandomExploration},
-        terminate::SinkStates,
-    },
+    strategy::{explore::ExplorationStrategy, terminate::SinkStates},
 };
 
 use engarde_client::{
@@ -31,20 +28,31 @@ use engarde_client::{
     Action,
 };
 
-struct EpsilonGreedy(DQNAgentTrainer<MyState, 16, 35, 32>);
+struct EpsilonGreedy {
+    past_exp: DQNAgentTrainer<MyState, 16, 35, 32>,
+    epsilon: u64,
+}
 
 impl EpsilonGreedy {
-    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
-        EpsilonGreedy(trainer)
+    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>, start_epsilon: u64) -> Self {
+        EpsilonGreedy {
+            past_exp: trainer,
+            epsilon: start_epsilon,
+        }
+    }
+
+    fn decay_epsilon(&mut self) {
+        self.epsilon = (self.epsilon - (self.epsilon / 4375)).max(u64::MAX / 2);
     }
 }
 
 impl ExplorationStrategy<MyState> for EpsilonGreedy {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let mut rng = thread_rng();
         let random = rng.gen::<u64>();
 
-        if random < (u64::MAX / 2) {
+        if random < self.epsilon {
+            self.decay_epsilon();
             agent.pick_random_action()
         } else {
             let current_state = agent.current_state();
@@ -56,7 +64,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedy {
                 .map(|action| action.as_index())
                 .collect::<Vec<usize>>();
             // 評価値のリストを取得
-            let expected_values = self.0.expected_value(current_state);
+            let expected_values = self.past_exp.expected_value(current_state);
 
             // 有効なアクションと評価値のリストを取得
             let available_actions = expected_values
@@ -77,6 +85,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedy {
 
             // 行動
             agent.take_action(&action);
+            self.decay_epsilon();
             action
         }
     }
@@ -91,7 +100,7 @@ impl BestExplorationDqn {
 }
 
 impl ExplorationStrategy<MyState> for BestExplorationDqn {
-    fn pick_action(&self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let current_state = agent.current_state();
 
         // 行動していいアクション"のインデックス"のリストを取得
@@ -217,8 +226,14 @@ fn dqn_train() -> io::Result<()> {
             )
         })
     };
-    trainer.import_model(past_exp);
-    trainer.train(&mut agent, &mut SinkStates {}, &RandomExploration);
+    trainer.import_model(past_exp.clone());
+    let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+    trainer2.import_model(past_exp);
+    trainer.train(
+        &mut agent,
+        &mut SinkStates {},
+        &mut EpsilonGreedy::new(trainer2, u64::MAX),
+    );
     {
         let learned_values = trainer.export_learned_values();
         let linear0 = learned_values.0 .0;
@@ -328,7 +343,7 @@ fn dqn_eval() -> io::Result<()> {
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &BestExplorationDqn::new(trainer2),
+        &mut BestExplorationDqn::new(trainer2),
     );
 
     Ok(())
