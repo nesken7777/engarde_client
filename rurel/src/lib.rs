@@ -158,7 +158,7 @@ where
         agent: &mut dyn Agent<S>,
         learning_strategy: &dyn LearningStrategy<S>,
         termination_strategy: &mut dyn TerminationStrategy<S>,
-        exploration_strategy: &dyn ExplorationStrategy<S>,
+        exploration_strategy: &mut dyn ExplorationStrategy<S>,
     ) {
         loop {
             let s_t = agent.current_state().clone();

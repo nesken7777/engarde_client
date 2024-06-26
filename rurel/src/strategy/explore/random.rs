@@ -23,7 +23,7 @@ impl Default for RandomExploration {
 }
 
 impl<S: State> ExplorationStrategy<S> for RandomExploration {
-    fn pick_action(&self, agent: &mut dyn Agent<S>) -> S::A {
+    fn pick_action(&mut self, agent: &mut dyn Agent<S>) -> S::A {
         agent.pick_random_action()
     }
 }

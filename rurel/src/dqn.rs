@@ -200,7 +200,7 @@ where
         &mut self,
         agent: &mut dyn Agent<S>,
         termination_strategy: &mut dyn TerminationStrategy<S>,
-        exploration_strategy: &dyn ExplorationStrategy<S>,
+        exploration_strategy: &mut dyn ExplorationStrategy<S>,
     ) {
         loop {
             // Initialize batch
