@@ -84,7 +84,7 @@ impl IndexMut<usize> for AcceptableNumbers {
 pub fn count_4and5(hands: [Maisuu; 5]) -> u8 {
     [Maisuu::THREE, Maisuu::FOUR, Maisuu::FIVE]
         .iter()
-        .map(|&i| hands[i.denote_usize()].denote())
+        .map(|&i| hands[i.denote_usize() - 1].denote())
         .sum()
 }
 /// 三枚以上持っているカードをtrueにして返す
@@ -191,18 +191,18 @@ pub fn should_go_2_7(
     //7の距離に行くべき状態か判断する
 
     if let Some(movement) = movement_togo7 {
-        if hands[movement.card().denote_usize()] != Maisuu::ZERO
+        if hands[movement.card().denote_usize() - 1] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[movement.card().denote_usize()]
+            && acceptable[movement.card().denote_usize() - 1]
         {
             return togo7;
         }
     };
     //2の距離に行くべきかを判定する
     if let Some(movement) = movement_togo2 {
-        if hands[movement.card().denote_usize()] != Maisuu::ZERO
+        if hands[movement.card().denote_usize() - 1] != Maisuu::ZERO
             && movement.direction() == Direction::Forward
-            && acceptable[movement.card().denote_usize()]
+            && acceptable[movement.card().denote_usize() - 1]
         {
             return togo2;
         }
