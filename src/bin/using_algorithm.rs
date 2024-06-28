@@ -11,7 +11,7 @@ use engarde_client::{
     algorithm::{card_map_from_hands, ProbabilityTable},
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
-    protocol::{BoardInfo, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
+    protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
 };
 use rand::{seq::SliceRandom, thread_rng};
@@ -123,14 +123,7 @@ fn act(state: &MyStateAlg) -> Option<Action> {
     let card_map = card_map_from_hands(&state.hands)?;
     let distance = state.p1_position - state.p0_position;
     let acceptable = AcceptableNumbers::new(card_map, state.cards, distance);
-    let table = ProbabilityTable::new(
-        25 - state
-            .cards
-            .iter()
-            .map(engarde_client::Maisuu::denote)
-            .sum::<u8>(),
-        &state.cards,
-    );
+    let table = ProbabilityTable::new(&state.cards);
     let initial = initial_move(&card_map, distance, &acceptable).ok();
     let middle = middle_move(&state.hands, distance, state.cards, &table);
     let det = initial.or(middle);
@@ -174,6 +167,7 @@ fn main() -> io::Result<()> {
                     Messages::Accept(_) => (),
                     Messages::DoPlay(_) => {
                         let action = act(&state).unwrap_or_else(|| panic!("行動決定不能"));
+                        send_info(&mut bufwriter, &Evaluation::new())?;
                         send_action(&mut bufwriter, action)?;
                         state.cards.used_card(action);
                     }

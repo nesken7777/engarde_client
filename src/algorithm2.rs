@@ -110,9 +110,9 @@ pub fn initial_move(
     //4と5が使用可能か問い合わせる
 
     for i in (0..5).rev() {
-        if acceptable[usize::from(i)] {
+        if acceptable[usize::from(i)] && hands[usize::from(i)].denote() > 0 {
             return Ok(Action::Move(Movement::new(
-                CardID::from_u8(i).ok_or("意味わからんけど")?,
+                CardID::from_u8(i + 1).ok_or("意味わからんけど")?,
                 Direction::Forward,
             )));
         }
@@ -121,7 +121,7 @@ pub fn initial_move(
 
     let average = calc_ave(hands);
     //clippyに従うとエラーになった
-    if average < Ratio::from_integer(3) {
+    if average < Ratio::from_integer(3) && hands[Maisuu::TWO.denote_usize() - 1].denote() > 0 {
         Ok(Action::Move(Movement::new(
             CardID::from_u8(2).ok_or("意味わからんけど")?,
             Direction::Forward,
