@@ -138,7 +138,7 @@ impl State for MyState {
                     self.calc_dist(),
                     self.rest_cards(),
                     self.hands(),
-                    &ProbabilityTable::new(self.calc_num_of_deck(), &self.rest_cards()),
+                    &ProbabilityTable::new(&self.rest_cards()),
                     action,
                 )
             })
