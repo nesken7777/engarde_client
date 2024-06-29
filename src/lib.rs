@@ -467,3 +467,72 @@ impl From<[f32; 35]> for Action {
         Action::from_index(idx)
     }
 }
+
+impl From<Action> for [f32; 3] {
+    fn from(value: Action) -> Self {
+        match value {
+            Action::Move(movement) => match movement.direction() {
+                Direction::Forward => [0.0, f32::from(movement.card().denote()), 1.0],
+                Direction::Back => [2.0, f32::from(movement.card().denote()), 1.0],
+            },
+            Action::Attack(attack) => {
+                let Attack { card, quantity } = attack;
+                [1.0, f32::from(card.denote()), f32::from(quantity.denote())]
+            }
+        }
+    }
+}
+
+impl From<[f32; 3]> for Action {
+    fn from(value: [f32; 3]) -> Self {
+        #[allow(clippy::float_cmp)]
+        fn card_id_from_f32(value: f32) -> CardID {
+            let value = value.round();
+            if value <= 1.0 {
+                CardID::One
+            } else if value == 2.0 {
+                CardID::Two
+            } else if value == 3.0 {
+                CardID::Three
+            } else if value == 4.0 {
+                CardID::Four
+            } else {
+                CardID::Five
+            }
+        }
+        #[allow(clippy::float_cmp)]
+        fn maisuu_from_f32(value: f32) -> Maisuu {
+            let value = value.round();
+            if value <= 1.0 {
+                Maisuu::ONE
+            } else if value == 2.0 {
+                Maisuu::TWO
+            } else if value == 3.0 {
+                Maisuu::THREE
+            } else if value == 4.0 {
+                Maisuu::FOUR
+            } else {
+                Maisuu::FIVE
+            }
+        }
+        let action = value[0].round();
+        #[allow(clippy::float_cmp)]
+        if action == 1.0 {
+            let card = card_id_from_f32(value[1]);
+            let quantity = maisuu_from_f32(value[2]);
+            Action::Attack(Attack { card, quantity })
+        } else if action == 0.0 || action <= 0.0 {
+            let card = card_id_from_f32(value[1]);
+            Action::Move(Movement {
+                card,
+                direction: Direction::Forward,
+            })
+        } else {
+            let card = card_id_from_f32(value[1]);
+            Action::Move(Movement {
+                card,
+                direction: Direction::Back,
+            })
+        }
+    }
+}
