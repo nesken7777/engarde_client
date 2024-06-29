@@ -1,6 +1,7 @@
 //! DQNのAIクライアント
 
 use std::{
+    cmp::Ordering,
     fs::create_dir_all,
     io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
@@ -17,7 +18,7 @@ use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::ExplorationStrategy, terminate::SinkStates},
+    strategy::{explore::{ExplorationStrategy, RandomExploration}, terminate::SinkStates},
 };
 
 use engarde_client::{
@@ -25,17 +26,148 @@ use engarde_client::{
     protocol::{BoardInfo, Messages, PlayerName},
     read_stream, send_info,
     states::{MyAgent, MyState},
-    Action,
+    Action, CardID, Direction,
 };
 
-struct EpsilonGreedy {
-    past_exp: DQNAgentTrainer<MyState, 16, 35, 32>,
+type DQNAgentTrainerDiscreate = DQNAgentTrainer<MyState, 16, 35, 32>;
+type DQNAgentTrainerContinuous = DQNAgentTrainer<MyState, 16, 3, 128>;
+
+const INNER_DISCREATE: usize = 32;
+const INNER_CONTINUOUS: usize = 128;
+const ACTION_SIZE_DISCREATE: usize = 35;
+const ACTION_SIZE_CONTINUOUS: usize = 3;
+
+/// ベストに近いアクションを返す
+#[allow(dead_code, clippy::too_many_lines)]
+fn neary_best_action(state: &MyState, trainer: &DQNAgentTrainerContinuous) -> Option<Action> {
+    let best = trainer.best_action(state)?;
+    let actions = state.actions();
+    if actions.contains(&best) {
+        Some(best)
+    } else {
+        match best {
+            Action::Move(movement) => {
+                // 前進の場合、前進-攻撃-後退の順に並び替え
+                // 後退の場合、後退-攻撃-前進の順に並び替え
+                // (クソ長い)
+                fn ordering(
+                    key_direction: Direction,
+                    key_card: CardID,
+                    action1: Action,
+                    action2: Action,
+                ) -> Ordering {
+                    match action1 {
+                        Action::Move(movement1) => {
+                            let card1 = movement1.card();
+                            let direction1 = movement1.direction();
+                            match direction1 {
+                                Direction::Forward => match action2 {
+                                    Action::Move(movement2) => {
+                                        let card2 = movement2.card();
+                                        let direction2 = movement2.direction();
+                                        match direction2 {
+                                            Direction::Forward => {
+                                                let key_card_i32 = i32::from(key_card.denote());
+                                                let card1_i32 = i32::from(card1.denote());
+                                                let card2_i32 = i32::from(card2.denote());
+                                                (card1_i32 - key_card_i32)
+                                                    .abs()
+                                                    .cmp(&(card2_i32 - key_card_i32).abs())
+                                            }
+                                            Direction::Back => match key_direction {
+                                                Direction::Forward => Ordering::Less,
+                                                Direction::Back => Ordering::Greater,
+                                            },
+                                        }
+                                    }
+                                    Action::Attack(_) => match key_direction {
+                                        Direction::Forward => Ordering::Less,
+                                        Direction::Back => Ordering::Greater,
+                                    },
+                                },
+                                Direction::Back => match action2 {
+                                    Action::Move(movement2) => {
+                                        let card2 = movement2.card();
+                                        let direction2 = movement2.direction();
+                                        match direction2 {
+                                            Direction::Forward => match key_direction {
+                                                Direction::Forward => Ordering::Greater,
+                                                Direction::Back => Ordering::Less,
+                                            },
+                                            Direction::Back => {
+                                                let key_card_i32 = i32::from(key_card.denote());
+                                                let card1_i32 = i32::from(card1.denote());
+                                                let card2_i32 = i32::from(card2.denote());
+                                                (card1_i32 - key_card_i32)
+                                                    .abs()
+                                                    .cmp(&(card2_i32 - key_card_i32).abs())
+                                            }
+                                        }
+                                    }
+                                    Action::Attack(_) => match key_direction {
+                                        Direction::Forward => Ordering::Greater,
+                                        Direction::Back => Ordering::Less,
+                                    },
+                                },
+                            }
+                        }
+                        Action::Attack(_) => match action2 {
+                            Action::Move(movement2) => {
+                                let direction2 = movement2.direction();
+                                match direction2 {
+                                    Direction::Forward => match key_direction {
+                                        Direction::Forward => Ordering::Greater,
+                                        Direction::Back => Ordering::Less,
+                                    },
+                                    Direction::Back => match key_direction {
+                                        Direction::Forward => Ordering::Less,
+                                        Direction::Back => Ordering::Greater,
+                                    },
+                                }
+                            }
+                            Action::Attack(_) => Ordering::Equal,
+                        },
+                    }
+                }
+                let card = movement.card();
+                let direction = movement.direction();
+                match direction {
+                    Direction::Forward => {
+                        let mut actions = actions;
+                        actions.sort_by(|&action1, &action2| {
+                            ordering(Direction::Forward, card, action1, action2)
+                        });
+                        actions.first().copied()
+                    }
+                    Direction::Back => {
+                        let mut actions = actions;
+                        actions.sort_by(|&action1, &action2| {
+                            ordering(Direction::Back, card, action1, action2)
+                        });
+                        actions.first().copied()
+                    }
+                }
+            }
+            Action::Attack(_) => {
+                let mut actions = actions;
+                actions.sort_by_key(|action| match action {
+                    Action::Move(movement) => movement.card(),
+                    Action::Attack(attack) => attack.card(),
+                });
+                actions.first().copied()
+            }
+        }
+    }
+}
+
+struct EpsilonGreedyDiscrete {
+    past_exp: DQNAgentTrainerDiscreate,
     epsilon: u64,
 }
 
-impl EpsilonGreedy {
-    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>, start_epsilon: u64) -> Self {
-        EpsilonGreedy {
+impl EpsilonGreedyDiscrete {
+    fn new(trainer: DQNAgentTrainerDiscreate, start_epsilon: u64) -> Self {
+        EpsilonGreedyDiscrete {
             past_exp: trainer,
             epsilon: start_epsilon,
         }
@@ -46,7 +178,7 @@ impl EpsilonGreedy {
     }
 }
 
-impl ExplorationStrategy<MyState> for EpsilonGreedy {
+impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let mut rng = thread_rng();
         let random = rng.gen::<u64>();
@@ -91,15 +223,15 @@ impl ExplorationStrategy<MyState> for EpsilonGreedy {
     }
 }
 
-struct BestExplorationDqn(DQNAgentTrainer<MyState, 16, 35, 32>);
+struct BestExplorationDqnDiscrete(DQNAgentTrainerDiscreate);
 
-impl BestExplorationDqn {
-    fn new(trainer: DQNAgentTrainer<MyState, 16, 35, 32>) -> Self {
-        BestExplorationDqn(trainer)
+impl BestExplorationDqnDiscrete {
+    fn new(trainer: DQNAgentTrainerDiscreate) -> Self {
+        BestExplorationDqnDiscrete(trainer)
     }
 }
 
-impl ExplorationStrategy<MyState> for BestExplorationDqn {
+impl ExplorationStrategy<MyState> for BestExplorationDqnDiscrete {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let current_state = agent.current_state();
 
@@ -136,6 +268,62 @@ impl ExplorationStrategy<MyState> for BestExplorationDqn {
     }
 }
 
+struct EpsilonGreedyContinuous {
+    past_exp: DQNAgentTrainerContinuous,
+    epsilon: u64,
+}
+
+impl EpsilonGreedyContinuous {
+    fn new(trainer: DQNAgentTrainerContinuous, start_epsilon: u64) -> Self {
+        EpsilonGreedyContinuous {
+            past_exp: trainer,
+            epsilon: start_epsilon,
+        }
+    }
+
+    fn decay_epsilon(&mut self) {
+        self.epsilon = (self.epsilon - (self.epsilon / 4375)).max(u64::MAX / 2);
+    }
+}
+
+impl ExplorationStrategy<MyState> for EpsilonGreedyContinuous {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        let random = thread_rng().gen::<u64>();
+        if random < self.epsilon {
+            self.decay_epsilon();
+            agent.pick_random_action()
+        } else {
+            match neary_best_action(agent.current_state(), &self.past_exp) {
+                Some(action) => {
+                    agent.take_action(&action);
+                    action
+                }
+                None => agent.pick_random_action(),
+            }
+        }
+    }
+}
+
+struct BestExplorationDqnContinuous(DQNAgentTrainerContinuous);
+
+impl BestExplorationDqnContinuous {
+    fn new(trainer: DQNAgentTrainerContinuous) -> Self {
+        BestExplorationDqnContinuous(trainer)
+    }
+}
+
+impl ExplorationStrategy<MyState> for BestExplorationDqnContinuous {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        match neary_best_action(agent.current_state(), &self.0) {
+            Some(action) => {
+                agent.take_action(&action);
+                action
+            }
+            None => agent.pick_random_action(),
+        }
+    }
+}
+
 fn files_name(id: u8) -> (String, String, String, String, String, String) {
     (
         format!("learned_dqn/{id}/weight0.npy"),
@@ -148,7 +336,8 @@ fn files_name(id: u8) -> (String, String, String, String, String, String) {
 }
 
 fn dqn_train() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.999, 0.2);
+    // let mut trainer = DQNAgentTrainerDiscreate::new(0.999, 0.2);
+    let mut trainer = DQNAgentTrainerContinuous::new(0.999, 0.2);
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
@@ -187,12 +376,21 @@ fn dqn_train() -> io::Result<()> {
     );
     let past_exp = {
         let cpu = Cpu::default();
-        let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
-        let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-        let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
-        let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-        let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
-        let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+        let mut weight0: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
+        let mut bias0: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight1: Tensor<
+            (Const<INNER_CONTINUOUS>, Const<INNER_CONTINUOUS>),
+            f32,
+            Cpu,
+            NoneTape,
+        > = cpu.zeros();
+        let mut bias1: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight2: Tensor<
+            (Const<ACTION_SIZE_CONTINUOUS>, Const<INNER_CONTINUOUS>),
+            f32,
+            Cpu,
+        > = cpu.zeros();
+        let mut bias2: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
             weight0.load_from_npy(files.0).ok()?;
@@ -227,12 +425,12 @@ fn dqn_train() -> io::Result<()> {
         })
     };
     trainer.import_model(past_exp.clone());
-    let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
-    trainer2.import_model(past_exp);
+    // let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+    // trainer2.import_model(past_exp);
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &mut EpsilonGreedy::new(trainer2, u64::MAX),
+        &mut RandomExploration,
     );
     {
         let learned_values = trainer.export_learned_values();
@@ -258,7 +456,7 @@ fn dqn_train() -> io::Result<()> {
 }
 
 fn dqn_eval() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainer::<MyState, 16, 35, 32>::new(0.999, 0.2);
+    let mut trainer = DQNAgentTrainerContinuous::new(0.999, 0.2);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
@@ -298,12 +496,21 @@ fn dqn_eval() -> io::Result<()> {
     );
     let past_exp = {
         let cpu = Cpu::default();
-        let mut weight0: Tensor<(Const<32>, Const<16>), f32, Cpu> = cpu.zeros();
-        let mut bias0: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-        let mut weight1: Tensor<(Const<32>, Const<32>), f32, Cpu, NoneTape> = cpu.zeros();
-        let mut bias1: Tensor<(Const<32>,), f32, Cpu> = cpu.zeros();
-        let mut weight2: Tensor<(Const<35>, Const<32>), f32, Cpu> = cpu.zeros();
-        let mut bias2: Tensor<(Const<35>,), f32, Cpu> = cpu.zeros();
+        let mut weight0: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
+        let mut bias0: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight1: Tensor<
+            (Const<INNER_CONTINUOUS>, Const<INNER_CONTINUOUS>),
+            f32,
+            Cpu,
+            NoneTape,
+        > = cpu.zeros();
+        let mut bias1: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight2: Tensor<
+            (Const<ACTION_SIZE_CONTINUOUS>, Const<INNER_CONTINUOUS>),
+            f32,
+            Cpu,
+        > = cpu.zeros();
+        let mut bias2: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
             weight0.load_from_npy(files.0).ok()?;
@@ -343,7 +550,7 @@ fn dqn_eval() -> io::Result<()> {
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &mut BestExplorationDqn::new(trainer2),
+        &mut BestExplorationDqnContinuous::new(trainer2),
     );
 
     Ok(())
