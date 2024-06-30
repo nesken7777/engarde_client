@@ -18,7 +18,10 @@ use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::{ExplorationStrategy, RandomExploration}, terminate::SinkStates},
+    strategy::{
+        explore::{ExplorationStrategy, RandomExploration},
+        terminate::SinkStates,
+    },
 };
 
 use engarde_client::{
@@ -324,15 +327,24 @@ impl ExplorationStrategy<MyState> for BestExplorationDqnContinuous {
     }
 }
 
-fn files_name(id: u8) -> (String, String, String, String, String, String) {
-    (
-        format!("learned_dqn/{id}/weight0.npy"),
-        format!("learned_dqn/{id}/bias0.npy"),
-        format!("learned_dqn/{id}/weight1.npy"),
-        format!("learned_dqn/{id}/bias1.npy"),
-        format!("learned_dqn/{id}/weight2.npy"),
-        format!("learned_dqn/{id}/bias2.npy"),
-    )
+struct NNFileNames {
+    weight_in: String,
+    bias_in: String,
+    weight1: String,
+    bias1: String,
+    weight_out: String,
+    bias_out: String,
+}
+
+fn files_name(id: u8) -> NNFileNames {
+    NNFileNames {
+        weight_in: format!("learned_dqn/{id}/weight_in.npy"),
+        bias_in: format!("learned_dqn/{id}/bias_in.npy"),
+        weight1: format!("learned_dqn/{id}/weight1.npy"),
+        bias1: format!("learned_dqn/{id}/bias1.npy"),
+        weight_out: format!("learned_dqn/{id}/weight_out.npy"),
+        bias_out: format!("learned_dqn/{id}/bias_out.npy"),
+    }
 }
 
 fn dqn_train() -> io::Result<()> {
@@ -376,8 +388,8 @@ fn dqn_train() -> io::Result<()> {
     );
     let past_exp = {
         let cpu = Cpu::default();
-        let mut weight0: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
-        let mut bias0: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight_in: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
+        let mut bias_in: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let mut weight1: Tensor<
             (Const<INNER_CONTINUOUS>, Const<INNER_CONTINUOUS>),
             f32,
@@ -385,28 +397,28 @@ fn dqn_train() -> io::Result<()> {
             NoneTape,
         > = cpu.zeros();
         let mut bias1: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
-        let mut weight2: Tensor<
+        let mut weight_out: Tensor<
             (Const<ACTION_SIZE_CONTINUOUS>, Const<INNER_CONTINUOUS>),
             f32,
             Cpu,
         > = cpu.zeros();
-        let mut bias2: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut bias_out: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
-            weight0.load_from_npy(files.0).ok()?;
-            bias0.load_from_npy(files.1).ok()?;
-            weight1.load_from_npy(files.2).ok()?;
-            bias1.load_from_npy(files.3).ok()?;
-            weight2.load_from_npy(files.4).ok()?;
-            bias2.load_from_npy(files.5).ok()?;
+            weight_in.load_from_npy(files.weight_in).ok()?;
+            bias_in.load_from_npy(files.bias_in).ok()?;
+            weight1.load_from_npy(files.weight1).ok()?;
+            bias1.load_from_npy(files.bias1).ok()?;
+            weight_out.load_from_npy(files.weight_out).ok()?;
+            bias_out.load_from_npy(files.bias_out).ok()?;
             Some(())
         })()
         .map_or(trainer.export_learned_values(), |()| {
             (
                 (
                     Linear {
-                        weight: weight0,
-                        bias: bias0,
+                        weight: weight_in,
+                        bias: bias_in,
                     },
                     ReLU,
                 ),
@@ -418,8 +430,8 @@ fn dqn_train() -> io::Result<()> {
                     ReLU,
                 ),
                 Linear {
-                    weight: weight2,
-                    bias: bias2,
+                    weight: weight_out,
+                    bias: bias_out,
                 },
             )
         })
@@ -427,30 +439,26 @@ fn dqn_train() -> io::Result<()> {
     trainer.import_model(past_exp.clone());
     // let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
     // trainer2.import_model(past_exp);
-    trainer.train(
-        &mut agent,
-        &mut SinkStates {},
-        &mut RandomExploration,
-    );
+    trainer.train(&mut agent, &mut SinkStates {}, &mut RandomExploration);
     {
         let learned_values = trainer.export_learned_values();
-        let linear0 = learned_values.0 .0;
-        let weight0 = linear0.weight;
-        let bias0 = linear0.bias;
+        let linear_in = learned_values.0 .0;
+        let weight_in = linear_in.weight;
+        let bias_in = linear_in.bias;
         let linear1 = learned_values.1 .0;
         let weight1 = linear1.weight;
         let bias1 = linear1.bias;
-        let linear2 = learned_values.2;
-        let weight2 = linear2.weight;
-        let bias2 = linear2.bias;
+        let linear_out = learned_values.2;
+        let weight_out = linear_out.weight;
+        let bias_out = linear_out.bias;
         let files = files_name(id.denote());
         let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
-        weight0.save_to_npy(files.0)?;
-        bias0.save_to_npy(files.1)?;
-        weight1.save_to_npy(files.2)?;
-        bias1.save_to_npy(files.3)?;
-        weight2.save_to_npy(files.4)?;
-        bias2.save_to_npy(files.5)?;
+        weight_in.save_to_npy(files.weight_in)?;
+        bias_in.save_to_npy(files.bias_in)?;
+        weight1.save_to_npy(files.weight1)?;
+        bias1.save_to_npy(files.bias1)?;
+        weight_out.save_to_npy(files.weight_out)?;
+        bias_out.save_to_npy(files.bias_out)?;
     }
     Ok(())
 }
@@ -496,8 +504,8 @@ fn dqn_eval() -> io::Result<()> {
     );
     let past_exp = {
         let cpu = Cpu::default();
-        let mut weight0: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
-        let mut bias0: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut weight_in: Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu> = cpu.zeros();
+        let mut bias_in: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let mut weight1: Tensor<
             (Const<INNER_CONTINUOUS>, Const<INNER_CONTINUOUS>),
             f32,
@@ -505,28 +513,28 @@ fn dqn_eval() -> io::Result<()> {
             NoneTape,
         > = cpu.zeros();
         let mut bias1: Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
-        let mut weight2: Tensor<
+        let mut weight_out: Tensor<
             (Const<ACTION_SIZE_CONTINUOUS>, Const<INNER_CONTINUOUS>),
             f32,
             Cpu,
         > = cpu.zeros();
-        let mut bias2: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
+        let mut bias_out: Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu> = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
-            weight0.load_from_npy(files.0).ok()?;
-            bias0.load_from_npy(files.1).ok()?;
-            weight1.load_from_npy(files.2).ok()?;
-            bias1.load_from_npy(files.3).ok()?;
-            weight2.load_from_npy(files.4).ok()?;
-            bias2.load_from_npy(files.5).ok()?;
+            weight_in.load_from_npy(files.weight_in).ok()?;
+            bias_in.load_from_npy(files.bias_in).ok()?;
+            weight1.load_from_npy(files.weight1).ok()?;
+            bias1.load_from_npy(files.bias1).ok()?;
+            weight_out.load_from_npy(files.weight_out).ok()?;
+            bias_out.load_from_npy(files.bias_out).ok()?;
             Some(())
         })()
         .map_or(trainer.export_learned_values(), |()| {
             (
                 (
                     Linear {
-                        weight: weight0,
-                        bias: bias0,
+                        weight: weight_in,
+                        bias: bias_in,
                     },
                     ReLU,
                 ),
@@ -538,8 +546,8 @@ fn dqn_eval() -> io::Result<()> {
                     ReLU,
                 ),
                 Linear {
-                    weight: weight2,
-                    bias: bias2,
+                    weight: weight_out,
+                    bias: bias_out,
                 },
             )
         })
