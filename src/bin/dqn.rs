@@ -443,9 +443,9 @@ fn dqn_train() -> io::Result<()> {
     trainer.import_model(past_exp.clone());
     let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
     trainer2.import_model(past_exp);
-    let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))?
-        .parse::<u64>()
-        .expect("εが適切なu64値でない");
+    let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
+        .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
+        .unwrap_or(u64::MAX);
     let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 10);
     let mut epsilon_greedy_exploration = EpsilonGreedyContinuous::new(trainer2, epsilon);
     trainer.train(
