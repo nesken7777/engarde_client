@@ -2,7 +2,7 @@
 
 use std::{
     cmp::Ordering,
-    fs::create_dir_all,
+    fs::{self, create_dir_all},
     io::{self, BufReader, BufWriter},
     net::{SocketAddr, TcpStream},
 };
@@ -18,10 +18,7 @@ use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{
-        explore::{ExplorationStrategy, RandomExploration},
-        terminate::SinkStates,
-    },
+    strategy::{explore::ExplorationStrategy, terminate::SinkStates},
 };
 
 use engarde_client::{
@@ -175,10 +172,6 @@ impl EpsilonGreedyDiscrete {
             epsilon: start_epsilon,
         }
     }
-
-    fn decay_epsilon(&mut self) {
-        self.epsilon = (self.epsilon - (self.epsilon / 4375)).max(u64::MAX / 2);
-    }
 }
 
 impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
@@ -187,7 +180,6 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
         let random = rng.gen::<u64>();
 
         if random < self.epsilon {
-            self.decay_epsilon();
             agent.pick_random_action()
         } else {
             let current_state = agent.current_state();
@@ -220,7 +212,6 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
 
             // 行動
             agent.take_action(&action);
-            self.decay_epsilon();
             action
         }
     }
@@ -437,9 +428,18 @@ fn dqn_train() -> io::Result<()> {
         })
     };
     trainer.import_model(past_exp.clone());
-    // let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
-    // trainer2.import_model(past_exp);
-    trainer.train(&mut agent, &mut SinkStates {}, &mut RandomExploration);
+    let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+    trainer2.import_model(past_exp);
+    let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))?
+        .parse::<u64>()
+        .expect("εが適切なu64値でない");
+    let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 10);
+    let mut epsilon_greedy_exploration = EpsilonGreedyContinuous::new(trainer2, epsilon);
+    trainer.train(
+        &mut agent,
+        &mut SinkStates {},
+        &mut epsilon_greedy_exploration,
+    );
     {
         let learned_values = trainer.export_learned_values();
         let linear_in = learned_values.0 .0;
@@ -459,6 +459,10 @@ fn dqn_train() -> io::Result<()> {
         bias1.save_to_npy(files.bias1)?;
         weight_out.save_to_npy(files.weight_out)?;
         bias_out.save_to_npy(files.bias_out)?;
+        fs::write(
+            format!("learned_dqn/{}/epsilon.txt", id.denote()),
+            epsilon_greedy_exploration.epsilon.to_string(),
+        )?;
     }
     Ok(())
 }
