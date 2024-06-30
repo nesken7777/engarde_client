@@ -19,7 +19,7 @@ use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
     strategy::{
-        explore::ExplorationStrategy,
+        explore::{ExplorationStrategy, RandomExploration},
         terminate::{SinkStates, TerminationStrategy},
     },
 };
@@ -47,8 +47,8 @@ const INNER_CONTINUOUS: usize = 128;
 const ACTION_SIZE_DISCREATE: usize = 35;
 const ACTION_SIZE_CONTINUOUS: usize = 3;
 
-const DISCOUNT_RATE : f32 = 0.9;
-const LEARNING_RATE : f32 = 0.1;
+const DISCOUNT_RATE: f32 = 0.9;
+const LEARNING_RATE: f32 = 0.1;
 
 /// ベストに近いアクションを返す
 #[allow(dead_code, clippy::too_many_lines)]
@@ -448,13 +448,9 @@ fn dqn_train() -> io::Result<()> {
     let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
         .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
         .unwrap_or(u64::MAX);
-    let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 5 * 2);
+    let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 10);
     let mut epsilon_greedy_exploration = EpsilonGreedyContinuous::new(trainer2, epsilon);
-    trainer.train(
-        &mut agent,
-        &mut SinkStates {},
-        &mut epsilon_greedy_exploration,
-    );
+    trainer.train(&mut agent, &mut SinkStates {}, &mut RandomExploration {});
     {
         let learned_values = trainer.export_learned_values();
         let linear_in = learned_values.0 .0;
