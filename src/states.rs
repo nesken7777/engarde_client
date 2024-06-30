@@ -117,14 +117,10 @@ impl MyState {
     fn calc_dist(&self) -> u8 {
         self.p1_position - self.p0_position
     }
-}
 
-impl State for MyState {
-    type A = Action;
-    #[allow(clippy::float_arithmetic)]
-    fn reward(&self) -> f64 {
+    fn calc_safe_reward(&self) -> f64 {
         let actions = self.actions();
-        let a = actions
+        actions
             .iter()
             .map(|&action| {
                 safe_possibility(
@@ -139,10 +135,37 @@ impl State for MyState {
             .unwrap_or(Ratio::<u64>::zero())
             .to_f64()
             .expect("なんで")
-            .mul(200.0)
-            .powi(2);
-        let b = (f64::from(self.my_score())).powi(2) - (f64::from(self.enemy_score())).powi(2);
-        a + b
+            .mul(20000.0)
+    }
+
+    #[allow(clippy::float_arithmetic)]
+    fn calc_score_reward(&self) -> f64 {
+        (f64::from(self.my_score()) * 1000.0) - (f64::from(self.enemy_score()) * 1000.0)
+    }
+
+    fn distance_from_center(&self) -> i8 {
+        match self.my_id {
+            PlayerID::Zero => 12 - i8::try_from(self.p0_position).expect("i8の表現範囲外"),
+            PlayerID::One => i8::try_from(self.p1_position).expect("i8の表現範囲外") - 12,
+        }
+    }
+
+    #[allow(clippy::float_arithmetic)]
+    fn calc_position_reward(&self) -> f64 {
+        let factor = f64::from(self.distance_from_center()) * 20.0;
+        factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
+    }
+}
+
+impl State for MyState {
+    type A = Action;
+
+    #[allow(clippy::float_arithmetic)]
+    fn reward(&self) -> f64 {
+        let a = self.calc_safe_reward();
+        let b = self.calc_score_reward();
+        let c = self.calc_position_reward();
+        a + b + c
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
@@ -373,6 +396,11 @@ impl Agent<MyState> for MyAgent {
                             } else {
                                 "負けました!"
                             })?;
+                            print(format!("最終報酬:{}", self.state.reward()))?;
+                            print(format!(
+                                "safe_possibilityの寄与:{}",
+                                self.state.calc_safe_reward()
+                            ))?;
                             self.state.game_end = true;
                             break;
                         }
