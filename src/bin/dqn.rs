@@ -351,8 +351,6 @@ fn files_name(id: u8) -> NNFileNames {
 }
 
 fn dqn_train() -> io::Result<()> {
-    // let mut trainer = DQNAgentTrainerDiscreate::new(DISCOUNT_RATE, LEARNING_RATE);
-    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
@@ -389,6 +387,9 @@ fn dqn_train() -> io::Result<()> {
         bufreader,
         bufwriter,
     );
+
+    // let mut trainer = DQNAgentTrainerDiscreate::new(DISCOUNT_RATE, LEARNING_RATE);
+    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
     let past_exp = {
         let cpu = Cpu::default();
         let mut weight_in: WeightInTensor = cpu.zeros();
@@ -500,8 +501,6 @@ fn evaluation(
 }
 
 fn dqn_eval() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
-
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
@@ -538,6 +537,8 @@ fn dqn_eval() -> io::Result<()> {
         bufreader,
         bufwriter,
     );
+
+    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
     let past_exp = {
         let cpu = Cpu::default();
         let mut weight_in: WeightInTensor = cpu.zeros();
