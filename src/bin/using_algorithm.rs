@@ -1,6 +1,7 @@
 //! アルゴリズムによって動くクライアント
 
 use std::{
+    cmp::Ordering,
     collections::HashSet,
     hash::RandomState,
     io::{self, BufReader, BufWriter},
@@ -14,7 +15,6 @@ use engarde_client::{
     protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
 };
-use rand::{seq::SliceRandom, thread_rng};
 
 struct MyStateAlg {
     id: PlayerID,
@@ -128,9 +128,24 @@ fn act(state: &MyStateAlg) -> Option<Action> {
     let middle = middle_move(&state.hands, distance, state.cards, &table);
     let det = initial.or(middle);
     Some(det.unwrap_or({
-        let mut rng = thread_rng();
-        let actions = state.actions();
-        actions.choose(&mut rng).copied()?
+        let mut actions = state.actions();
+        actions.sort_unstable_by(|action1, action2| match action1 {
+            Action::Move(movement1) => match action2 {
+                Action::Move(movement2) => match movement1.direction() {
+                    Direction::Forward => match movement2.direction() {
+                        Direction::Forward => movement2.card().cmp(&movement1.card()),
+                        Direction::Back => Ordering::Less,
+                    },
+                    Direction::Back => match movement2.direction() {
+                        Direction::Forward => Ordering::Greater,
+                        Direction::Back => movement1.card().cmp(&movement2.card()),
+                    },
+                },
+                Action::Attack(_) => Ordering::Greater,
+            },
+            Action::Attack(_) => Ordering::Less,
+        });
+        actions.first().copied()?
     }))
 }
 
