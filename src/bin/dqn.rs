@@ -281,17 +281,12 @@ impl EpsilonGreedyContinuous {
             epsilon: start_epsilon,
         }
     }
-
-    fn decay_epsilon(&mut self) {
-        self.epsilon = (self.epsilon - (self.epsilon / 4375)).max(u64::MAX / 2);
-    }
 }
 
 impl ExplorationStrategy<MyState> for EpsilonGreedyContinuous {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let random = thread_rng().gen::<u64>();
         if random < self.epsilon {
-            self.decay_epsilon();
             agent.pick_random_action()
         } else {
             match neary_best_action(agent.current_state(), &self.past_exp) {
