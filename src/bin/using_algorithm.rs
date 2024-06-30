@@ -193,10 +193,10 @@ fn main() -> io::Result<()> {
                     }
                     Messages::Played(played) => state.cards.used_card(played.to_action()),
                     Messages::RoundEnd(_round_end) => {
-                        print("ラウンド終わり!")?;
                         state.cards = RestCards::new();
                     }
-                    Messages::GameEnd(_game_end) => {
+                    Messages::GameEnd(game_end) => {
+                        print(format!("勝者:{}", game_end.winner()))?;
                         break;
                     }
                 },

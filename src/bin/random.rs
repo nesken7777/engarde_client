@@ -156,10 +156,9 @@ fn random_main() -> io::Result<()> {
                         break;
                     }
                     Messages::Played(_) => {}
-                    Messages::RoundEnd(_round_end) => {
-                        print("ラウンド終わり!")?;
-                    }
-                    Messages::GameEnd(_game_end) => {
+                    Messages::RoundEnd(_round_end) => {}
+                    Messages::GameEnd(game_end) => {
+                        print(format!("勝者:{}", game_end.winner()))?;
                         break;
                     }
                 },
