@@ -18,7 +18,10 @@ use rand::{thread_rng, Rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
-    strategy::{explore::ExplorationStrategy, terminate::SinkStates},
+    strategy::{
+        explore::ExplorationStrategy,
+        terminate::{SinkStates, TerminationStrategy},
+    },
 };
 
 use engarde_client::{
@@ -480,6 +483,19 @@ fn dqn_train() -> io::Result<()> {
     Ok(())
 }
 
+fn evaluation(
+    agent: &mut MyAgent,
+    termination_strategy: &mut dyn TerminationStrategy<MyState>,
+    best_exploration_strategy: &mut BestExplorationDqnContinuous,
+) {
+    loop {
+        best_exploration_strategy.pick_action(agent);
+        if termination_strategy.should_stop(agent.current_state()) {
+            break;
+        }
+    }
+}
+
 fn dqn_eval() -> io::Result<()> {
     let mut trainer = DQNAgentTrainerContinuous::new(0.999, 0.2);
 
@@ -572,14 +588,11 @@ fn dqn_eval() -> io::Result<()> {
         })
     };
     trainer.import_model(past_exp.clone());
-    let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
-    trainer2.import_model(past_exp);
-    trainer.train(
+    evaluation(
         &mut agent,
         &mut SinkStates {},
-        &mut BestExplorationDqnContinuous::new(trainer2),
+        &mut BestExplorationDqnContinuous::new(trainer),
     );
-
     Ok(())
 }
 
