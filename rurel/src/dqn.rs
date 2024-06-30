@@ -10,7 +10,7 @@ use crate::{
     strategy::{explore::ExplorationStrategy, terminate::TerminationStrategy},
 };
 
-const BATCH: usize = 64;
+const BATCH: usize = 512;
 
 type QNetwork<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
     (Linear<STATE_SIZE, INNER_SIZE>, ReLU),
