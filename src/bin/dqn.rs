@@ -47,6 +47,9 @@ const INNER_CONTINUOUS: usize = 128;
 const ACTION_SIZE_DISCREATE: usize = 35;
 const ACTION_SIZE_CONTINUOUS: usize = 3;
 
+const DISCOUNT_RATE : f32 = 0.9;
+const LEARNING_RATE : f32 = 0.1;
+
 /// ベストに近いアクションを返す
 #[allow(dead_code, clippy::too_many_lines)]
 fn neary_best_action(state: &MyState, trainer: &DQNAgentTrainerContinuous) -> Option<Action> {
@@ -348,8 +351,8 @@ fn files_name(id: u8) -> NNFileNames {
 }
 
 fn dqn_train() -> io::Result<()> {
-    // let mut trainer = DQNAgentTrainerDiscreate::new(0.999, 0.2);
-    let mut trainer = DQNAgentTrainerContinuous::new(0.999, 0.2);
+    // let mut trainer = DQNAgentTrainerDiscreate::new(DISCOUNT_RATE, LEARNING_RATE);
+    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
@@ -439,12 +442,12 @@ fn dqn_train() -> io::Result<()> {
         })
     };
     trainer.import_model(past_exp.clone());
-    let mut trainer2 = DQNAgentTrainer::new(0.99, 0.2);
+    let mut trainer2 = DQNAgentTrainer::new(DISCOUNT_RATE, LEARNING_RATE);
     trainer2.import_model(past_exp);
     let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
         .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
         .unwrap_or(u64::MAX);
-    let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 10);
+    let epsilon = (epsilon - (epsilon / 100)).max(u64::MAX / 5 * 2);
     let mut epsilon_greedy_exploration = EpsilonGreedyContinuous::new(trainer2, epsilon);
     trainer.train(
         &mut agent,
@@ -497,7 +500,7 @@ fn evaluation(
 }
 
 fn dqn_eval() -> io::Result<()> {
-    let mut trainer = DQNAgentTrainerContinuous::new(0.999, 0.2);
+    let mut trainer = DQNAgentTrainerContinuous::new(DISCOUNT_RATE, LEARNING_RATE);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
     let stream = loop {
