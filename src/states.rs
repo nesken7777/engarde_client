@@ -238,7 +238,7 @@ impl State for MyState {
 //     enemy_position: u8,
 //     game_end: bool,
 // }
-impl From<MyState> for [f32; 16] {
+impl From<MyState> for [f32; 15] {
     fn from(value: MyState) -> Self {
         let id = vec![f32::from(value.my_id.denote())];
         let hands = value
@@ -260,7 +260,6 @@ impl From<MyState> for [f32; 16] {
         let p1_score = vec![value.p1_score as f32];
         let my_position = vec![f32::from(value.p0_position)];
         let enemy_position = vec![f32::from(value.p1_position)];
-        let game_end = vec![f32::from(u8::from(value.game_end))];
         [
             id,
             hands,
@@ -269,11 +268,10 @@ impl From<MyState> for [f32; 16] {
             p1_score,
             my_position,
             enemy_position,
-            game_end,
         ]
         .concat()
         .try_into()
-        .expect("長さが16")
+        .expect("長さが15")
     }
 }
 

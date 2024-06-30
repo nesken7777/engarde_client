@@ -32,9 +32,9 @@ use engarde_client::{
     Action, CardID, Direction,
 };
 
-type DQNAgentTrainerDiscreate = DQNAgentTrainer<MyState, 16, 35, 32>;
-type DQNAgentTrainerContinuous = DQNAgentTrainer<MyState, 16, 3, 128>;
-type WeightInTensor = Tensor<(Const<INNER_CONTINUOUS>, Const<16>), f32, Cpu>;
+type DQNAgentTrainerDiscreate = DQNAgentTrainer<MyState, 15, 35, 32>;
+type DQNAgentTrainerContinuous = DQNAgentTrainer<MyState, 15, 3, 128>;
+type WeightInTensor = Tensor<(Const<INNER_CONTINUOUS>, Const<15>), f32, Cpu>;
 type BiasInTensor = Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu>;
 type WeightInnerTensor =
     Tensor<(Const<INNER_CONTINUOUS>, Const<INNER_CONTINUOUS>), f32, Cpu, NoneTape>;
