@@ -19,7 +19,6 @@ use crate::{
     print,
     protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID},
     read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
-    HANDS_DEFAULT_U8,
 };
 
 /// Stateは、結果状態だけからその評価と次できる行動のリストを与える。
@@ -117,12 +116,6 @@ impl MyState {
 
     fn calc_dist(&self) -> u8 {
         self.p1_position - self.p0_position
-    }
-
-    fn calc_num_of_deck(&self) -> u8 {
-        self.rest_cards().iter().map(Maisuu::denote).sum::<u8>()
-            - u8::try_from(self.hands.len()).expect("いけるって")
-            - HANDS_DEFAULT_U8
     }
 }
 
