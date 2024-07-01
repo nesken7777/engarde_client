@@ -117,11 +117,12 @@ pub fn initial_move(
             )));
         }
     }
+    unreachable!("{:?}\n距離:{:?}", hands, distance);
     //todo:平均にする
 
     let average = calc_ave(hands);
     //clippyに従うとエラーになった
-    if average < Ratio::from_integer(3) && hands[Maisuu::TWO.denote_usize() - 1].denote() > 0 {
+    if average < Ratio::from_integer(3) && hands[CardID::Two.denote_usize() - 1].denote() > 0 {
         Ok(Action::Move(Movement::new(
             CardID::from_u8(2).ok_or("意味わからんけど")?,
             Direction::Forward,
