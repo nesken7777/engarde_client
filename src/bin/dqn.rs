@@ -32,7 +32,6 @@ use engarde_client::{
     Action, CardID, Direction,
 };
 
-type DQNAgentTrainerDiscreate = DQNAgentTrainer<MyState, 15, 35, 32>;
 type DQNAgentTrainerContinuous = DQNAgentTrainer<MyState, 15, 3, 128>;
 type WeightInTensor = Tensor<(Const<INNER_CONTINUOUS>, Const<15>), f32, Cpu>;
 type BiasInTensor = Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu>;
@@ -42,9 +41,7 @@ type BiasInnerTensor = Tensor<(Const<INNER_CONTINUOUS>,), f32, Cpu>;
 type WeightOutTensor = Tensor<(Const<ACTION_SIZE_CONTINUOUS>, Const<INNER_CONTINUOUS>), f32, Cpu>;
 type BiasOutTensor = Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu>;
 
-const INNER_DISCREATE: usize = 32;
 const INNER_CONTINUOUS: usize = 128;
-const ACTION_SIZE_DISCREATE: usize = 35;
 const ACTION_SIZE_CONTINUOUS: usize = 3;
 
 const DISCOUNT_RATE: f32 = 0.9;
@@ -170,108 +167,6 @@ fn neary_best_action(state: &MyState, trainer: &DQNAgentTrainerContinuous) -> Op
                 actions.first().copied()
             }
         }
-    }
-}
-
-struct EpsilonGreedyDiscrete {
-    past_exp: DQNAgentTrainerDiscreate,
-    epsilon: u64,
-}
-
-impl EpsilonGreedyDiscrete {
-    fn new(trainer: DQNAgentTrainerDiscreate, start_epsilon: u64) -> Self {
-        EpsilonGreedyDiscrete {
-            past_exp: trainer,
-            epsilon: start_epsilon,
-        }
-    }
-}
-
-impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
-    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        let mut rng = thread_rng();
-        let random = rng.gen::<u64>();
-
-        if random < self.epsilon {
-            agent.pick_random_action()
-        } else {
-            let current_state = agent.current_state();
-
-            // 行動していいアクション"のインデックス"のリストを取得
-            let available_action_indicies = current_state
-                .actions()
-                .into_iter()
-                .map(|action| action.as_index())
-                .collect::<Vec<usize>>();
-            // 評価値のリストを取得
-            let expected_values = self.past_exp.expected_value(current_state);
-
-            // 有効なアクションと評価値のリストを取得
-            let available_actions = expected_values
-                .into_iter()
-                .enumerate()
-                .filter(|(i, _)| available_action_indicies.contains(i))
-                .collect::<Vec<(usize, f32)>>();
-
-            // 評価値が最大のインデックスを取得
-            let action_index = available_actions
-                .into_iter()
-                .max_by(|(_, value), (_, other_value)| value.total_cmp(other_value))
-                .expect("必ず最大値がある")
-                .0;
-
-            // そのインデックスでアクションに変換
-            let action = Action::from_index(action_index);
-
-            // 行動
-            agent.take_action(&action);
-            action
-        }
-    }
-}
-
-struct BestExplorationDqnDiscrete(DQNAgentTrainerDiscreate);
-
-impl BestExplorationDqnDiscrete {
-    fn new(trainer: DQNAgentTrainerDiscreate) -> Self {
-        BestExplorationDqnDiscrete(trainer)
-    }
-}
-
-impl ExplorationStrategy<MyState> for BestExplorationDqnDiscrete {
-    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        let current_state = agent.current_state();
-
-        // 行動していいアクション"のインデックス"のリストを取得
-        let available_action_indicies = current_state
-            .actions()
-            .into_iter()
-            .map(|action| action.as_index())
-            .collect::<Vec<usize>>();
-
-        // 評価値のリストを取得
-        let expected_values = self.0.expected_value(current_state);
-
-        // 有効なアクションと評価値のリストを取得
-        let available_actions = expected_values
-            .into_iter()
-            .enumerate()
-            .filter(|(i, _)| available_action_indicies.contains(i))
-            .collect::<Vec<(usize, f32)>>();
-
-        // 評価値が最大のインデックスを取得
-        let action_index = available_actions
-            .into_iter()
-            .max_by(|(_, value), (_, other_value)| value.total_cmp(other_value))
-            .expect("必ず最大値がある")
-            .0;
-
-        // そのインデックスでアクションに変換
-        let action = Action::from_index(action_index);
-
-        // 行動
-        agent.take_action(&action);
-        action
     }
 }
 
