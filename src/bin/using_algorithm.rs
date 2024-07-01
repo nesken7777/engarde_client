@@ -13,13 +13,13 @@ use engarde_client::{
     algorithm2::{initial_move, middle_move, AcceptableNumbers},
     get_id, print,
     protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
-    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
+    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, UsedCards,
 };
 
 struct MyStateAlg {
     id: PlayerID,
     hands: Vec<CardID>,
-    cards: RestCards,
+    used: UsedCards,
     p0_position: u8,
     p1_position: u8,
 }
@@ -28,14 +28,14 @@ impl MyStateAlg {
     fn new(
         id: PlayerID,
         hands: Vec<CardID>,
-        cards: RestCards,
+        used: UsedCards,
         p0_position: u8,
         p1_position: u8,
     ) -> Self {
         Self {
             id,
             hands,
-            cards,
+            used,
             p0_position,
             p1_position,
         }
@@ -122,10 +122,11 @@ impl MyStateAlg {
 fn act(state: &MyStateAlg) -> Option<Action> {
     let card_map = card_map_from_hands(&state.hands)?;
     let distance = state.p1_position - state.p0_position;
-    let acceptable = AcceptableNumbers::new(card_map, state.cards, distance);
-    let table = ProbabilityTable::new(&state.cards);
+    let restcard = state.used.to_restcards(card_map);
+    let acceptable = AcceptableNumbers::new(card_map, restcard, distance);
+    let table = ProbabilityTable::new(&restcard);
     let initial = initial_move(&card_map, distance, &acceptable).ok();
-    let middle = middle_move(&state.hands, distance, state.cards, &table);
+    let middle = middle_move(&state.hands, distance, restcard, &table);
     let det = initial.or(middle);
     Some(det.unwrap_or({
         let mut actions = state.actions();
@@ -169,7 +170,7 @@ fn main() -> io::Result<()> {
         let _ = read_stream(&mut bufreader)?;
     }
     {
-        let mut state = MyStateAlg::new(id, vec![], RestCards::new(), 1, 23);
+        let mut state = MyStateAlg::new(id, vec![], UsedCards::new(), 1, 23);
         loop {
             match Messages::parse(&read_stream(&mut bufreader)?) {
                 Ok(messages) => match messages {
@@ -184,16 +185,16 @@ fn main() -> io::Result<()> {
                         let action = act(&state).unwrap_or_else(|| panic!("行動決定不能"));
                         send_info(&mut bufwriter, &Evaluation::new())?;
                         send_action(&mut bufwriter, action)?;
-                        state.cards.used_card(action);
+                        state.used.used_action(action);
                     }
                     Messages::ServerError(e) => {
                         print("エラーもらった")?;
                         print(format!("{e:?}"))?;
                         break;
                     }
-                    Messages::Played(played) => state.cards.used_card(played.to_action()),
+                    Messages::Played(played) => state.used.used_action(played.to_action()),
                     Messages::RoundEnd(_round_end) => {
-                        state.cards = RestCards::new();
+                        state.used = UsedCards::new();
                     }
                     Messages::GameEnd(game_end) => {
                         print(format!("勝者:{}", game_end.winner()))?;

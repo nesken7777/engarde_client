@@ -15,10 +15,10 @@ use num_traits::{ToPrimitive, Zero};
 use rurel::mdp::{Agent, State};
 
 use crate::{
-    algorithm::{safe_possibility, ProbabilityTable},
+    algorithm::{card_map_from_hands, safe_possibility, ProbabilityTable},
     print,
     protocol::{Evaluation, Messages, PlayAttack, PlayMovement, PlayerID},
-    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
+    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, UsedCards,
 };
 
 /// Stateは、結果状態だけからその評価と次できる行動のリストを与える。
@@ -26,7 +26,7 @@ use crate::{
 pub struct MyState {
     my_id: PlayerID,
     hands: Vec<CardID>,
-    cards: RestCards,
+    used: UsedCards,
     p0_score: u32,
     p1_score: u32,
     p0_position: u8,
@@ -45,9 +45,9 @@ impl MyState {
         self.my_id
     }
 
-    /// `RestCards`を返します。
-    pub fn rest_cards(&self) -> RestCards {
-        self.cards
+    /// `UsedCards`を返します。
+    pub fn used_cards(&self) -> UsedCards {
+        self.used
     }
 
     /// プレイヤー0のスコアを返します。
@@ -81,7 +81,7 @@ impl MyState {
     pub fn new(
         my_id: PlayerID,
         hands: Vec<CardID>,
-        cards: RestCards,
+        used: UsedCards,
         p0_score: u32,
         p1_score: u32,
         p0_position: u8,
@@ -91,7 +91,7 @@ impl MyState {
         Self {
             my_id,
             hands,
-            cards,
+            used,
             p0_score,
             p1_score,
             p0_position,
@@ -120,14 +120,15 @@ impl MyState {
 
     fn calc_safe_reward(&self) -> f64 {
         let actions = self.actions();
+        let card_map = card_map_from_hands(&self.hands).expect("安心して");
         actions
             .iter()
             .map(|&action| {
                 safe_possibility(
                     self.calc_dist(),
-                    self.rest_cards(),
+                    self.used_cards().to_restcards(card_map),
                     self.hands(),
-                    &ProbabilityTable::new(&self.rest_cards()),
+                    &ProbabilityTable::new(&self.used_cards().to_restcards(card_map)),
                     action,
                 )
             })
@@ -271,7 +272,8 @@ impl From<MyState> for [f32; 15] {
             .collect::<Vec<f32>>()
             .also(|hands| hands.resize(5, 0.0));
         let cards = value
-            .cards
+            .used
+            .get_nakami()
             .iter()
             .map(|&x| f32::from(x.denote()))
             .collect::<Vec<f32>>();
@@ -322,7 +324,7 @@ impl MyAgent {
             state: MyState {
                 my_id: id,
                 hands,
-                cards: RestCards::new(),
+                used: UsedCards::new(),
                 p0_score: 0,
                 p1_score: 0,
                 p0_position: position_0,
@@ -361,6 +363,7 @@ impl Agent<MyState> for MyAgent {
                         HandInfo(hand_info) => {
                             let hand_vec = hand_info.to_vec();
                             self.state.hands = hand_vec;
+
                             break;
                         }
                         Accept(_) => {}
@@ -374,7 +377,7 @@ impl Agent<MyState> for MyAgent {
                             break;
                         }
                         Played(played) => {
-                            self.state.cards.used_card(played.to_action());
+                            self.state.used.used_action(played.to_action());
                             break;
                         }
                         RoundEnd(round_end) => {
@@ -386,7 +389,7 @@ impl Agent<MyState> for MyAgent {
                                 1 => self.state.p1_score += 1,
                                 _ => {}
                             }
-                            self.state.cards = RestCards::new();
+                            self.state.used = UsedCards::new();
                             break;
                         }
                         GameEnd(game_end) => {
