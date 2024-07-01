@@ -96,12 +96,56 @@ fn dqn_loop(final_loop: usize, loop_count: usize, max_score: u32) {
     }
 }
 
+fn dqn_loop2(final_loop: usize, loop_count: usize, max_score: u32) {
+    for i in 0..final_loop * loop_count {
+        let mut server = Command::new(".\\engarde_server.exe")
+            .arg(max_score.to_string())
+            .spawn()
+            .expect("engarde_server.exe起動失敗");
+        let mut client0 = Command::new(".\\dqn.exe")
+            .arg("-m")
+            .arg("train")
+            .spawn()
+            .expect("dqn.exe起動失敗");
+        let mut client1 = Command::new(".\\using_algorithm.exe")
+            .arg("-m")
+            .arg("train")
+            .spawn()
+            .expect("using_algorithm.exe起動失敗");
+
+        server.wait().expect("engarde_serverクラッシュ");
+        client0.wait().expect("dqn.exeクラッシュ");
+        client1.wait().expect("using_algorithm.exeクラッシュ");
+        print(format!("{i}")).expect("出力に失敗");
+    }
+    for i in 0..final_loop * loop_count {
+        let mut server = Command::new(".\\engarde_server.exe")
+            .arg(max_score.to_string())
+            .spawn()
+            .expect("engarde_server.exe起動失敗");
+        let mut client1 = Command::new(".\\using_algorithm.exe")
+            .arg("-m")
+            .arg("train")
+            .spawn()
+            .expect("using_algorithm.exe起動失敗");
+        let mut client0 = Command::new(".\\dqn.exe")
+            .arg("-m")
+            .arg("train")
+            .spawn()
+            .expect("dqn.exe起動失敗");
+        server.wait().expect("engarde_serverクラッシュ");
+        client0.wait().expect("dqn.exeクラッシュ");
+        client1.wait().expect("using_algorithm.exeクラッシュ");
+        print(format!("{i}")).expect("出力に失敗");
+    }
+}
+
 fn main() {
     let args = Args::parse();
     match args.learning_mode {
         LearningMode::QLearning => {
             q_learning_loop(args.final_loop, args.loop_count, args.max_score);
         }
-        LearningMode::Dqn => dqn_loop(args.final_loop, args.loop_count, args.max_score),
+        LearningMode::Dqn => dqn_loop2(args.final_loop, args.loop_count, args.max_score),
     }
 }
