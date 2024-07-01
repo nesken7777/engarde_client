@@ -11,7 +11,7 @@ use std::{
 use engarde_client::{
     get_id, print,
     protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
-    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, RestCards,
+    read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement,
 };
 
 struct MyStateAlg {
@@ -171,9 +171,8 @@ fn main() -> io::Result<()> {
                         print(format!("{e:?}"))?;
                         break;
                     }
-                    Messages::Played(_) => {},
-                    Messages::RoundEnd(_round_end) => {
-                    }
+                    Messages::Played(_) => {}
+                    Messages::RoundEnd(_round_end) => {}
                     Messages::GameEnd(game_end) => {
                         print(format!("勝者:{}", game_end.winner()))?;
                         break;
