@@ -136,7 +136,7 @@ impl MyState {
             .unwrap_or(Ratio::<u64>::zero())
             .to_f64()
             .expect("なんで")
-            .mul(20000.0)
+            .mul(2000.0)
     }
 
     #[allow(clippy::float_arithmetic)]
@@ -153,8 +153,7 @@ impl MyState {
 
     #[allow(clippy::float_arithmetic)]
     fn calc_position_reward(&self) -> f64 {
-        let factor = f64::from(self.distance_from_center()) * 20.0;
-        factor.powi(2) * if factor < 0.0 { 1.0 } else { -1.0 }
+        f64::from(self.distance_from_center()) * 200.0
     }
 }
 
