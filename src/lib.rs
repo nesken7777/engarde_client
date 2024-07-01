@@ -296,7 +296,7 @@ impl UsedCards {
             })
             .collect::<Vec<Maisuu>>()
             .try_into()
-            .unwrap();
+            .expect("配列`[Maisuu; 5]`に変換できなかった");
         RestCards::from_slice(&restcard)
     }
 }
