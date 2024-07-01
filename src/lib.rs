@@ -239,6 +239,68 @@ where
     Ok(())
 }
 
+/// 使ったカードの枚数をカード番号ごとに記録
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub struct UsedCards {
+    used: [Maisuu; 5],
+}
+
+impl UsedCards {
+    /// 全部使われていない使ったおを作ります
+    pub fn new() -> Self {
+        Self {
+            used: [Maisuu::ZERO; 5],
+        }
+    }
+
+    /// カード番号と枚数から、使われたカードを更新します
+    pub fn used(&mut self, card: CardID, maisuu: Maisuu) {
+        match card {
+            CardID::One => self.used[0].saturating_sub(maisuu),
+            CardID::Two => self.used[1].saturating_sub(maisuu),
+            CardID::Three => self.used[2].saturating_sub(maisuu),
+            CardID::Four => self.used[3].saturating_sub(maisuu),
+            CardID::Five => self.used[4].saturating_sub(maisuu),
+        };
+    }
+
+    /// アクションから使われたカードを更新します
+    pub fn used_action(&mut self, action: Action) {
+        match action {
+            Action::Move(movement) => self.used(movement.card(), Maisuu::ONE),
+            Action::Attack(attack) => self.used(attack.card(), attack.quantity().saturating_mul(2)),
+        }
+    }
+
+    /// 中身
+    pub fn get_nakami(&self) -> [Maisuu; 5] {
+        self.used
+    }
+
+    /// 使用したカードの枚数の合計
+    pub fn sum(&self) -> u8 {
+        self.used.iter().map(|maisuu| maisuu.denote()).sum()
+    }
+
+    /// RestCardsが必要なやつばっかりなので、作っときました
+    pub fn to_restcards(&self, card_map: [Maisuu; 5]) -> RestCards {
+        let restcard_max = [Maisuu::MAX; 5];
+        let restcard: [Maisuu; 5] = restcard_max
+            .iter()
+            .zip(self.used.iter())
+            .zip(card_map.iter())
+            .map(|((&maisuu_rest, &maisuu_used), &maisuu_hand)| {
+                maisuu_rest
+                    .saturating_sub(maisuu_used)
+                    .saturating_sub(maisuu_hand)
+            })
+            .collect::<Vec<Maisuu>>()
+            .try_into()
+            .unwrap();
+        RestCards::from_slice(&restcard)
+    }
+}
+
 /// 残りのカード枚数(カード番号ごと)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct RestCards {
