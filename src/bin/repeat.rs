@@ -2,7 +2,7 @@
 
 use std::{
     fmt::{Display, Formatter, Result},
-    process::Command,
+    process::{Child, Command},
 };
 
 use clap::{Parser, ValueEnum};
@@ -10,7 +10,48 @@ use engarde_client::print;
 
 const FINAL_LOOP_COUNT: usize = 20;
 const LOOP_COUNT: usize = 20;
-const MAX_SCORE: u32 = 100;
+const MAX_ROUND: u32 = 100;
+
+#[derive(ValueEnum, Clone, Debug)]
+enum Client {
+    Dqn,
+    Random,
+    Algorithm,
+    Aggressive,
+}
+
+impl Client {
+    fn execute(&self) -> Child {
+        match self {
+            Self::Dqn => Command::new(".\\dqn.exe")
+                .arg("-m")
+                .arg("train")
+                .spawn()
+                .expect("dqn.exe起動失敗"),
+            Self::Random => Command::new(".\\random.exe")
+                .spawn()
+                .expect("random.exe起動失敗"),
+            Self::Algorithm => Command::new(".\\using_algorithm.exe")
+                .spawn()
+                .expect("using_algorithm.exe起動失敗"),
+            Self::Aggressive => Command::new(".\\aggressive.exe")
+                .spawn()
+                .expect("aggressive.exe起動失敗"),
+        }
+    }
+}
+
+impl Display for Client {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let s = match self {
+            Self::Dqn => "dqn",
+            Self::Random => "random",
+            Self::Algorithm => "algorithm",
+            Self::Aggressive => "aggressive",
+        };
+        s.fmt(f)
+    }
+}
 
 #[derive(ValueEnum, Clone, Debug)]
 enum LearningMode {
@@ -30,122 +71,31 @@ impl Display for LearningMode {
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(long, short, default_value_t = LearningMode::Dqn)]
-    learning_mode: LearningMode,
-    #[arg(long, short, default_value_t = FINAL_LOOP_COUNT)]
-    final_loop: usize,
+    #[arg(long,short,default_value_t = Client::Random)]
+    player0: Client,
+    #[arg(long,short,default_value_t = Client::Random)]
+    player1: Client,
     #[arg(long, short = 'c', default_value_t = LOOP_COUNT)]
     loop_count: usize,
-    #[arg(long, short, default_value_t = MAX_SCORE)]
-    max_score: u32,
+    #[arg(long, short, default_value_t = MAX_ROUND)]
+    max_round: u32,
 }
 
-fn q_learning_loop(final_loop: usize, loop_count: usize, max_score: u32) {
-    for _ in 0..final_loop {
-        let mut client0 = Command::new(".\\q-learning.exe")
-            .arg("-m")
-            .arg("train")
-            .arg("-i")
-            .arg(0.to_string())
-            .arg("-l")
-            .arg(loop_count.to_string())
-            .spawn()
-            .expect("q-learning.exe起動失敗");
-        let mut client1 = Command::new(".\\q-learning.exe")
-            .arg("-m")
-            .arg("train")
-            .arg("-i")
-            .arg(1.to_string())
-            .arg("-l")
-            .arg(loop_count.to_string())
-            .spawn()
-            .expect("q-learning.exe起動失敗");
-        for _ in 0..loop_count {
-            let mut server = Command::new(".\\engarde_server.exe")
-                .arg(max_score.to_string())
-                .spawn()
-                .expect("engarde_server.exe起動失敗");
-            server.wait().expect("engarde_serverクラッシュ");
-        }
-        client0.wait().expect("q-learning.exeクラッシュ");
-        client1.wait().expect("q-learning.exeクラッシュ");
-    }
-}
-
-fn dqn_loop(final_loop: usize, loop_count: usize, max_score: u32) {
-    for i in 0..final_loop * loop_count {
+fn client_loop(client0: Client, client1: Client, loop_count: usize, max_round: u32) {
+    for _ in 0..loop_count {
         let mut server = Command::new(".\\engarde_server.exe")
-            .arg(max_score.to_string())
+            .arg(max_round.to_string())
             .spawn()
             .expect("engarde_server.exe起動失敗");
-        let mut client0 = Command::new(".\\dqn.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("dqn.exe起動失敗");
-        let mut client1 = Command::new(".\\dqn.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("dqn.exe起動失敗");
-
+        let mut client0 = client0.execute();
+        let mut client1 = client1.execute();
         server.wait().expect("engarde_serverクラッシュ");
-        client0.wait().expect("dqn.exeクラッシュ");
-        client1.wait().expect("dqn.exeクラッシュ");
-        print(format!("{i}")).expect("出力に失敗");
-    }
-}
-
-fn dqn_loop2(final_loop: usize, loop_count: usize, max_score: u32) {
-    for i in 0..final_loop * loop_count {
-        let mut server = Command::new(".\\engarde_server.exe")
-            .arg(max_score.to_string())
-            .spawn()
-            .expect("engarde_server.exe起動失敗");
-        let mut client0 = Command::new(".\\dqn.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("dqn.exe起動失敗");
-        let mut client1 = Command::new(".\\using_algorithm.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("using_algorithm.exe起動失敗");
-
-        server.wait().expect("engarde_serverクラッシュ");
-        client0.wait().expect("dqn.exeクラッシュ");
-        client1.wait().expect("using_algorithm.exeクラッシュ");
-        print(format!("{i}")).expect("出力に失敗");
-    }
-    for i in 0..final_loop * loop_count {
-        let mut server = Command::new(".\\engarde_server.exe")
-            .arg(max_score.to_string())
-            .spawn()
-            .expect("engarde_server.exe起動失敗");
-        let mut client1 = Command::new(".\\using_algorithm.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("using_algorithm.exe起動失敗");
-        let mut client0 = Command::new(".\\dqn.exe")
-            .arg("-m")
-            .arg("train")
-            .spawn()
-            .expect("dqn.exe起動失敗");
-        server.wait().expect("engarde_serverクラッシュ");
-        client0.wait().expect("dqn.exeクラッシュ");
-        client1.wait().expect("using_algorithm.exeクラッシュ");
-        print(format!("{i}")).expect("出力に失敗");
+        client0.wait().expect("p0クラッシュ");
+        client1.wait().expect("p1クラッシュ");
     }
 }
 
 fn main() {
     let args = Args::parse();
-    match args.learning_mode {
-        LearningMode::QLearning => {
-            q_learning_loop(args.final_loop, args.loop_count, args.max_score);
-        }
-        LearningMode::Dqn => dqn_loop2(args.final_loop, args.loop_count, args.max_score),
-    }
+    client_loop(args.player0, args.player1, args.loop_count, args.max_round)
 }
