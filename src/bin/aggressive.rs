@@ -174,7 +174,9 @@ fn main() -> io::Result<()> {
                     Messages::Played(_) => {}
                     Messages::RoundEnd(_round_end) => {}
                     Messages::GameEnd(game_end) => {
-                        print(format!("勝者:{}", game_end.winner()))?;
+                        if game_end.winner() == state.id.denote() {
+                            print("aggressiveの勝ち")?;
+                        }
                         break;
                     }
                 },

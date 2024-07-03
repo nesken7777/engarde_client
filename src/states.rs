@@ -394,9 +394,9 @@ impl Agent<MyState> for MyAgent {
                         GameEnd(game_end) => {
                             print(format!("ゲーム終わり! 勝者:{}", game_end.winner()).as_str())?;
                             print(if game_end.winner() == self.state.my_id.denote() {
-                                "勝ちました!"
+                                "AIが勝ちました!"
                             } else {
-                                "負けました!"
+                                ""
                             })?;
                             print(format!("最終報酬:{}", self.state.reward()))?;
                             print(format!(

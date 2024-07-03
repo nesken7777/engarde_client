@@ -197,7 +197,9 @@ fn main() -> io::Result<()> {
                         state.used = UsedCards::new();
                     }
                     Messages::GameEnd(game_end) => {
-                        print(format!("勝者:{}", game_end.winner()))?;
+                        if game_end.winner() == state.id.denote() {
+                            print("algorithmの勝ち")?;
+                        }
                         break;
                     }
                 },
