@@ -109,17 +109,34 @@ impl MyState {
 
     fn act(&self, rng: &mut ThreadRng) -> Option<Action> {
         let actions = self.actions();
-        let actions = actions
-            .into_iter()
-            .filter(|x| match x {
-                Action::Move(m) => match m.direction() {
-                    Direction::Forward => true,
-                    Direction::Back => false,
-                },
+        let attack = actions
+            .iter()
+            .find(|x| match x {
                 Action::Attack(_) => true,
+                _ => false,
             })
+            .copied();
+        let forwards = actions
+            .iter()
+            .filter(|x| match x {
+                Action::Move(movement) if matches!(movement.direction(), Direction::Forward) => {
+                    true
+                }
+                _ => false,
+            })
+            .map(|&x| x)
             .collect::<Vec<Action>>();
-        actions.choose(rng).copied()
+        let backs = actions
+            .iter()
+            .filter(|x| match x {
+                Action::Move(movement) if matches!(movement.direction(), Direction::Back) => true,
+                _ => false,
+            })
+            .map(|&x| x)
+            .collect::<Vec<Action>>();
+        attack
+            .or(forwards.choose(rng).copied())
+            .or(backs.choose(rng).copied())
     }
 }
 
