@@ -5,7 +5,7 @@ use std::{
     collections::HashSet,
     hash::RandomState,
     io::{self, BufReader, BufWriter},
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, SocketAddrV4, TcpStream},
 };
 
 use engarde_client::{
@@ -15,6 +15,8 @@ use engarde_client::{
     protocol::{BoardInfo, Evaluation, Messages, PlayAttack, PlayMovement, PlayerID, PlayerName},
     read_stream, send_info, Action, Attack, CardID, Direction, Maisuu, Movement, UsedCards,
 };
+
+use clap::Parser;
 
 struct MyStateAlg {
     id: PlayerID,
@@ -157,9 +159,22 @@ fn send_action(writer: &mut BufWriter<TcpStream>, action: Action) -> io::Result<
     }
 }
 
+#[derive(Parser, Debug)]
+struct Arguments {
+    #[arg(long, short, default_value_t = String::from("127.0.0.1"))]
+    ip: String,
+    #[arg(long, short, default_value_t = String::from("12052"))]
+    port: String,
+}
+
 fn main() -> io::Result<()> {
+    let args = Arguments::parse();
+    let ip = format!("{}:{}", args.ip, args.port)
+        .parse::<SocketAddrV4>()
+        .expect("有効なIPアドレスではありません");
     // IPアドレスはいつか標準入力になると思います。
-    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+    let addr = ip;
     let stream = TcpStream::connect(addr)?;
     let (mut bufreader, mut bufwriter) =
         (BufReader::new(stream.try_clone()?), BufWriter::new(stream));

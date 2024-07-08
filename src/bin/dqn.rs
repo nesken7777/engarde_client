@@ -4,7 +4,7 @@ use std::{
     cmp::Ordering,
     fs::{self, create_dir_all},
     io::{self, BufReader, BufWriter},
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, SocketAddrV4, TcpStream},
 };
 
 use apply::Also;
@@ -245,8 +245,9 @@ fn files_name(id: u8) -> NNFileNames {
     }
 }
 
-fn dqn_train() -> io::Result<()> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+    let addr = ip;
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
             break stream;
@@ -395,8 +396,9 @@ fn evaluation(
     }
 }
 
-fn dqn_eval() -> io::Result<()> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 12052));
+    let addr = ip;
     let stream = loop {
         if let Ok(stream) = TcpStream::connect(addr) {
             break stream;
@@ -505,12 +507,19 @@ enum Mode {
 struct Arguments {
     #[arg(long, short)]
     mode: Mode,
+    #[arg(long, short, default_value_t = String::from("127.0.0.1"))]
+    ip: String,
+    #[arg(long, short, default_value_t = String::from("12052"))]
+    port: String,
 }
 
 fn main() -> io::Result<()> {
     let args = Arguments::parse();
+    let ip = format!("{}:{}", args.ip, args.port)
+        .parse::<SocketAddrV4>()
+        .expect("有効なIPアドレスではありません");
     match args.mode {
-        Mode::Train => dqn_train(),
-        Mode::Eval => dqn_eval(),
+        Mode::Train => dqn_train(ip),
+        Mode::Eval => dqn_eval(ip),
     }
 }
