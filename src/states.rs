@@ -272,7 +272,7 @@ impl From<MyState> for [f32; 15] {
             .also(|hands| hands.resize(5, 0.0));
         let cards = value
             .used
-            .get_nakami()
+            .into_inner()
             .iter()
             .map(|&x| f32::from(x.denote()))
             .collect::<Vec<f32>>();

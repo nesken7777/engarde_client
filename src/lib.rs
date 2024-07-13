@@ -273,7 +273,7 @@ impl UsedCards {
     }
 
     /// 中身
-    pub fn get_nakami(&self) -> [Maisuu; 5] {
+    pub fn into_inner(&self) -> [Maisuu; 5] {
         self.used
     }
 
