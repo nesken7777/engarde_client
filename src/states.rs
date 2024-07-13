@@ -6,7 +6,7 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter},
     net::TcpStream,
-    ops::Mul,
+    ops::{Mul, Neg},
 };
 
 use apply::Also;
@@ -153,7 +153,7 @@ impl MyState {
 
     #[allow(clippy::float_arithmetic)]
     fn calc_position_reward(&self) -> f64 {
-        f64::from(self.distance_from_center()) * 200.0
+        f64::from(self.distance_from_center()).neg() * 200.0
     }
 }
 
