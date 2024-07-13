@@ -6,13 +6,12 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
-use engarde_client::print;
 
 const FINAL_LOOP_COUNT: usize = 20;
 const LOOP_COUNT: usize = 20;
 const MAX_ROUND: u32 = 100;
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, Copy)]
 enum Client {
     Dqn,
     Random,
@@ -97,5 +96,5 @@ fn client_loop(client0: Client, client1: Client, loop_count: usize, max_round: u
 
 fn main() {
     let args = Args::parse();
-    client_loop(args.player0, args.player1, args.loop_count, args.max_round)
+    client_loop(args.player0, args.player1, args.loop_count, args.max_round);
 }
