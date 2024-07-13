@@ -362,13 +362,13 @@ impl Agent<MyState> for MyAgent {
                         HandInfo(hand_info) => {
                             let hand_vec = hand_info.to_vec();
                             self.state.hands = hand_vec;
-
                             break;
                         }
                         Accept(_) => {}
                         DoPlay(_) => {
                             send_info(&mut self.writer, &Evaluation::new())?;
                             send_action(&mut self.writer, action)?;
+                            self.state.used.used_action(action);
                         }
                         ServerError(e) => {
                             print("エラーもらった")?;
