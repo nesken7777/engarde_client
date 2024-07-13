@@ -377,7 +377,6 @@ impl Agent<MyState> for MyAgent {
                         }
                         Played(played) => {
                             self.state.used.used_action(played.to_action());
-                            break;
                         }
                         RoundEnd(round_end) => {
                             // print(
