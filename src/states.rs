@@ -31,6 +31,7 @@ pub struct MyState {
     p1_score: u32,
     p0_position: u8,
     p1_position: u8,
+    round_end: bool,
     game_end: bool,
 }
 
@@ -86,6 +87,7 @@ impl MyState {
         p1_score: u32,
         p0_position: u8,
         p1_position: u8,
+        round_end: bool,
         game_end: bool,
     ) -> Self {
         Self {
@@ -96,6 +98,7 @@ impl MyState {
             p1_score,
             p0_position,
             p1_position,
+            round_end,
             game_end,
         }
     }
@@ -328,6 +331,7 @@ impl MyAgent {
                 p1_score: 0,
                 p0_position: position_0,
                 p1_position: position_1,
+                round_end: false,
                 game_end: false,
             },
         }
@@ -351,6 +355,10 @@ impl Agent<MyState> for MyAgent {
         //selfキャプチャしたいからクロージャで書いてる
         let mut take_action_result = || -> io::Result<()> {
             loop {
+                if self.state.round_end {
+                    self.state.used = UsedCards::new();
+                    self.state.round_end = false;
+                }
                 match Messages::parse(&read_stream(&mut self.reader)?) {
                     Ok(messages) => match messages {
                         BoardInfo(board_info) => {
@@ -387,8 +395,7 @@ impl Agent<MyState> for MyAgent {
                                 1 => self.state.p1_score += 1,
                                 _ => {}
                             }
-                            self.state.used = UsedCards::new();
-                            break;
+                            self.state.round_end = true;
                         }
                         GameEnd(game_end) => {
                             print(format!("ゲーム終わり! 勝者:{}", game_end.winner()).as_str())?;
