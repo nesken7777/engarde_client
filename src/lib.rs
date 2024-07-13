@@ -256,11 +256,11 @@ impl UsedCards {
     /// カード番号と枚数から、使われたカードを更新します
     pub fn used(&mut self, card: CardID, maisuu: Maisuu) {
         match card {
-            CardID::One => self.used[0].saturating_sub(maisuu),
-            CardID::Two => self.used[1].saturating_sub(maisuu),
-            CardID::Three => self.used[2].saturating_sub(maisuu),
-            CardID::Four => self.used[3].saturating_sub(maisuu),
-            CardID::Five => self.used[4].saturating_sub(maisuu),
+            CardID::One => self.used[0] = self.used[0].saturating_add(maisuu),
+            CardID::Two => self.used[1] = self.used[1].saturating_add(maisuu),
+            CardID::Three => self.used[2] = self.used[2].saturating_add(maisuu),
+            CardID::Four => self.used[3] = self.used[3].saturating_add(maisuu),
+            CardID::Five => self.used[4] = self.used[4].saturating_add(maisuu),
         };
     }
 
