@@ -352,7 +352,10 @@ impl Agent<MyState> for MyAgent {
         use Messages::{
             Accept, BoardInfo, DoPlay, GameEnd, HandInfo, Played, RoundEnd, ServerError,
         };
-        //selfキャプチャしたいからクロージャで書いてる
+        // selfキャプチャしたいからクロージャで書いてる
+        // ※仕組み解説
+        // ライブラリ側でloopするはずなのに、なんでこっちでloopを書いてるかというと、状態が全て変わりきっていないにもかかわらず報酬計算&行動決定をしてほしくないからです。
+        // そのため、break(つまりこのループを抜け、ライブラリ側のloopにまわす)を使うのはHnadInfoとGameEndの時のみです。ServerErrorは例外です。
         let mut take_action_result = || -> io::Result<()> {
             loop {
                 if self.state.round_end {
