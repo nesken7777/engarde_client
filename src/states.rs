@@ -117,7 +117,7 @@ impl MyState {
         }
     }
 
-    fn calc_dist(&self) -> u8 {
+    fn distance_opposite(&self) -> u8 {
         self.p1_position - self.p0_position
     }
 
