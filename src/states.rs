@@ -31,6 +31,8 @@ pub struct MyState {
     p1_score: u32,
     p0_position: u8,
     p1_position: u8,
+    prev_state: Option<Box<MyState>>,
+    prev_action: Option<Action>,
     round_end: bool,
     game_end: bool,
 }
@@ -98,6 +100,8 @@ impl MyState {
             p1_score,
             p0_position,
             p1_position,
+            prev_state: None,
+            prev_action: None,
             round_end,
             game_end,
         }
@@ -122,24 +126,43 @@ impl MyState {
     }
 
     fn calc_safe_reward(&self) -> f64 {
-        let actions = self.actions();
-        let card_map = card_map_from_hands(&self.hands).expect("安心して");
-        actions
-            .iter()
-            .map(|&action| {
+        // let actions = self.actions();
+        // let card_map = card_map_from_hands(&self.hands).expect("安心して");
+        // actions
+        //     .iter()
+        //     .map(|&action| {
+        //         safe_possibility(
+        //             self.distance_opposite(),
+        //             self.used_cards().to_restcards(card_map),
+        //             self.hands(),
+        //             &ProbabilityTable::new(&self.used_cards().to_restcards(card_map)),
+        //             action,
+        //         )
+        //     })
+        //     .sum::<Option<Ratio<u64>>>()
+        //     .unwrap_or(Ratio::<u64>::zero())
+        //     .to_f64()
+        //     .expect("なんで")
+        //     .mul(2000.0)
+
+        // これもうちょっときれいに書けるやろ
+        match (self.prev_state.clone(), self.prev_action) {
+            (Some(state), Some(action)) => {
+                let card_map = card_map_from_hands(&state.hands).expect("安心して");
                 safe_possibility(
-                    self.calc_dist(),
-                    self.used_cards().to_restcards(card_map),
-                    self.hands(),
-                    &ProbabilityTable::new(&self.used_cards().to_restcards(card_map)),
+                    state.distance_opposite(),
+                    state.used_cards().to_restcards(card_map),
+                    &state.hands,
+                    &ProbabilityTable::new(&state.used_cards().to_restcards(card_map)),
                     action,
                 )
-            })
-            .sum::<Option<Ratio<u64>>>()
-            .unwrap_or(Ratio::<u64>::zero())
-            .to_f64()
-            .expect("なんで")
-            .mul(2000.0)
+                .unwrap_or(Ratio::<u64>::zero())
+                .to_f64()
+                .expect("安心して")
+                .mul(2000.0)
+            }
+            _ => 0.0,
+        }
     }
 
     #[allow(clippy::float_arithmetic)]
@@ -331,6 +354,8 @@ impl MyAgent {
                 p1_score: 0,
                 p0_position: position_0,
                 p1_position: position_1,
+                prev_state: None,
+                prev_action: None,
                 round_end: false,
                 game_end: false,
             },
@@ -379,6 +404,8 @@ impl Agent<MyState> for MyAgent {
                         DoPlay(_) => {
                             send_info(&mut self.writer, &Evaluation::new())?;
                             send_action(&mut self.writer, action)?;
+                            self.state.prev_state = Some(Box::new(self.state.clone()));
+                            self.state.prev_action = Some(action);
                             self.state.used.used_action(action);
                         }
                         ServerError(e) => {
