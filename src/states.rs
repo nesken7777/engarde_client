@@ -405,6 +405,12 @@ impl Agent<MyState> for MyAgent {
                                 ""
                             })?;
                             print(format!("最終報酬:{}", self.state.reward()))?;
+                            print(format!("p0の位置:{}", self.state.p0_position))?;
+                            print(format!("p1の位置:{}", self.state.p1_position))?;
+                            print(format!(
+                                "position_reward:{}",
+                                self.state.calc_position_reward()
+                            ))?;
                             print(format!(
                                 "safe_possibilityの寄与:{}",
                                 self.state.calc_safe_reward()
