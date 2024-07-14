@@ -287,7 +287,7 @@ impl State for MyState {
 //     enemy_position: u8,
 //     game_end: bool,
 // }
-impl From<MyState> for [f32; 15] {
+impl From<MyState> for [f32; 13] {
     fn from(value: MyState) -> Self {
         let id = vec![f32::from(value.my_id.denote())];
         let hands = value
@@ -302,26 +302,18 @@ impl From<MyState> for [f32; 15] {
             .iter()
             .map(|&x| f32::from(x.denote()))
             .collect::<Vec<f32>>();
-        #[allow(clippy::as_conversions)]
-        #[allow(clippy::cast_precision_loss)]
-        let p0_score = vec![value.p0_score as f32];
-        #[allow(clippy::as_conversions)]
-        #[allow(clippy::cast_precision_loss)]
-        let p1_score = vec![value.p1_score as f32];
         let my_position = vec![f32::from(value.p0_position)];
         let enemy_position = vec![f32::from(value.p1_position)];
         [
             id,
             hands,
             cards,
-            p0_score,
-            p1_score,
             my_position,
             enemy_position,
         ]
         .concat()
         .try_into()
-        .expect("長さが15")
+        .expect("長さが13")
     }
 }
 
