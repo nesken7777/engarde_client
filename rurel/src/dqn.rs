@@ -127,10 +127,10 @@ where
     }
 
     /// Returns the best action for the given `State`, or `None` if no values were learned.
-    pub fn best_action(&self, state: &S) -> Option<S::A> {
+    pub fn best_action(&self, state: &S) -> S::A {
         let target = self.expected_value(state);
 
-        Some(target.into())
+        target.into()
     }
 
     #[allow(clippy::boxed_local)]

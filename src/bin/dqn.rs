@@ -50,7 +50,7 @@ const LEARNING_RATE: f32 = 0.1;
 /// ベストに近いアクションを返す
 #[allow(dead_code, clippy::too_many_lines)]
 fn neary_best_action(state: &MyState, trainer: &DQNAgentTrainerContinuous) -> Option<Action> {
-    let best = trainer.best_action(state)?;
+    let best = trainer.best_action(state);
     let actions = state.actions();
     if actions.contains(&best) {
         Some(best)
