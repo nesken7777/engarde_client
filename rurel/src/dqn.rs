@@ -13,14 +13,14 @@ use crate::{
 const BATCH: usize = 512;
 
 type QNetwork<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (Linear<STATE_SIZE, INNER_SIZE>, Softmax),
-    (Linear<INNER_SIZE, INNER_SIZE>, Softmax),
+    (Linear<STATE_SIZE, INNER_SIZE>, AccurateGeLU),
+    (Linear<INNER_SIZE, INNER_SIZE>, AccurateGeLU),
     Linear<INNER_SIZE, ACTION_SIZE>,
 );
 
 type QNetworkDevice<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, Softmax),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, Softmax),
+    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, AccurateGeLU),
+    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, AccurateGeLU),
     nn::modules::Linear<INNER_SIZE, ACTION_SIZE, f32, Cpu>,
 );
 

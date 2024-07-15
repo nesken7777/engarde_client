@@ -11,7 +11,7 @@ use apply::Also;
 use clap::{Parser, ValueEnum};
 use dfdx::{
     nn::modules::{Linear, ReLU},
-    prelude::Softmax,
+    prelude::{AccurateGeLU, Exp, FastGeLU, LeakyReLU, Ln, Softmax, Tanh},
     shapes::Const,
     tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
 };
@@ -212,7 +212,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
                 .collect::<Vec<usize>>();
             // 評価値のリストを取得
             let expected_values = self.past_exp.expected_value(current_state);
-            println!("expected_values:{expected_values:?}");
+            println!("expected_values:{expected_values:.2?}");
             // 有効なアクションと評価値のリストを取得
             let available_actions = expected_values
                 .into_iter()
@@ -422,14 +422,14 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    Softmax,
+                    AccurateGeLU,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    Softmax,
+                    AccurateGeLU,
                 ),
                 Linear {
                     weight: weight_out,
@@ -556,14 +556,14 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    Softmax,
+                    AccurateGeLU,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    Softmax,
+                    AccurateGeLU,
                 ),
                 Linear {
                     weight: weight_out,
