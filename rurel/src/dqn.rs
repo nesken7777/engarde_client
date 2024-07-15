@@ -13,16 +13,14 @@ use crate::{
 const BATCH: usize = 512;
 
 type QNetwork<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (Linear<STATE_SIZE, INNER_SIZE>, ReLU),
-    (Linear<INNER_SIZE, INNER_SIZE>, ReLU),
-    (Linear<INNER_SIZE, INNER_SIZE>, ReLU),
+    (Linear<STATE_SIZE, INNER_SIZE>, Softmax),
+    (Linear<INNER_SIZE, INNER_SIZE>, Softmax),
     Linear<INNER_SIZE, ACTION_SIZE>,
 );
 
 type QNetworkDevice<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
+    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, Softmax),
+    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, Softmax),
     nn::modules::Linear<INNER_SIZE, ACTION_SIZE, f32, Cpu>,
 );
 
@@ -106,7 +104,7 @@ where
         let state_: [f32; STATE_SIZE] = (state.clone()).into();
         let states: Tensor<Rank1<STATE_SIZE>, f32, _> =
             self.dev.tensor(state_).normalize::<Axis<0>>(0.001);
-        let actions = self.target_q_net.forward(states).nans_to(0f32);
+        let actions = self.target_q_net.forward(states).nans_to(320000f32);
         actions.array()
     }
 
