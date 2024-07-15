@@ -11,7 +11,7 @@ use apply::Also;
 use clap::{Parser, ValueEnum};
 use dfdx::{
     nn::modules::{Linear, ReLU},
-    prelude::{AccurateGeLU, Exp, FastGeLU, LeakyReLU, Ln, Softmax, Tanh},
+    prelude::{AccurateGeLU, Exp, FastGeLU, LeakyReLU, Ln, Sigmoid, Softmax, Tanh},
     shapes::Const,
     tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
 };
@@ -422,14 +422,14 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    AccurateGeLU,
+                    Sigmoid,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    AccurateGeLU,
+                    Sigmoid,
                 ),
                 Linear {
                     weight: weight_out,
@@ -556,14 +556,14 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    AccurateGeLU,
+                    Sigmoid,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    AccurateGeLU,
+                    Sigmoid,
                 ),
                 Linear {
                     weight: weight_out,
