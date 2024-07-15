@@ -6,6 +6,7 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
+use engarde_client::print;
 
 const FINAL_LOOP_COUNT: usize = 20;
 const LOOP_COUNT: usize = 20;
@@ -81,7 +82,7 @@ struct Args {
 }
 
 fn client_loop(client0: Client, client1: Client, loop_count: usize, max_round: u32) {
-    for _ in 0..loop_count {
+    for i in 0..loop_count {
         let mut server = Command::new(".\\engarde_server.exe")
             .arg(max_round.to_string())
             .spawn()
@@ -91,6 +92,7 @@ fn client_loop(client0: Client, client1: Client, loop_count: usize, max_round: u
         server.wait().expect("engarde_serverクラッシュ");
         client0.wait().expect("p0クラッシュ");
         client1.wait().expect("p1クラッシュ");
+        print(i.to_string()).expect("");
     }
 }
 
