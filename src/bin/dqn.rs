@@ -422,14 +422,14 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    Sigmoid,
+                    ReLU,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    Sigmoid,
+                    ReLU,
                 ),
                 Linear {
                     weight: weight_out,
@@ -556,14 +556,14 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    Sigmoid,
+                    ReLU,
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    Sigmoid,
+                    ReLU,
                 ),
                 Linear {
                     weight: weight_out,
