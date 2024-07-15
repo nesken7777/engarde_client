@@ -212,7 +212,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
                 .collect::<Vec<usize>>();
             // 評価値のリストを取得
             let expected_values = self.past_exp.expected_value(current_state);
-            println!("expected_values:{expected_values:.2?}");
+            assert_ne!(expected_values[0], 320000f32, "NaN値になってます!");
             // 有効なアクションと評価値のリストを取得
             let available_actions = expected_values
                 .into_iter()
