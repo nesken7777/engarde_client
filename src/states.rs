@@ -33,7 +33,7 @@ pub struct MyState {
     p1_position: u8,
     prev_state: Option<Box<MyState>>,
     prev_action: Option<Action>,
-    round_end: bool,
+    round_winner: Option<Option<PlayerID>>,
     game_end: bool,
 }
 
@@ -89,7 +89,6 @@ impl MyState {
         p1_score: u32,
         p0_position: u8,
         p1_position: u8,
-        round_end: bool,
         game_end: bool,
     ) -> Self {
         Self {
@@ -102,7 +101,7 @@ impl MyState {
             p1_position,
             prev_state: None,
             prev_action: None,
-            round_end,
+            round_winner: None,
             game_end,
         }
     }
@@ -146,6 +145,9 @@ impl MyState {
         //     .mul(2000.0)
 
         // これもうちょっときれいに書けるやろ
+        if self.round_winner.is_some() {
+            return 0.0;
+        }
         match (self.prev_state.clone(), self.prev_action) {
             (Some(state), Some(action)) => {
                 let card_map = card_map_from_hands(&state.hands).expect("安心して");
@@ -179,7 +181,20 @@ impl MyState {
 
     #[allow(clippy::float_arithmetic)]
     fn calc_position_reward(&self) -> f64 {
-        f64::from(self.distance_from_center()).neg() * 200.0
+        f64::from(self.distance_from_center()).neg() * 4000.0
+    }
+
+    fn calc_winner_reward(&self) -> f64 {
+        match self.round_winner {
+            None | Some(None) => 0.0,
+            Some(Some(n)) => {
+                if n == self.my_id {
+                    100000.0
+                } else {
+                    -100000.0
+                }
+            }
+        }
     }
 }
 
@@ -189,9 +204,11 @@ impl State for MyState {
     #[allow(clippy::float_arithmetic)]
     fn reward(&self) -> f64 {
         let a = self.calc_safe_reward();
-        let b = self.calc_score_reward();
+        // let b = self.calc_score_reward();
+        let b = 0.0;
         let c = self.calc_position_reward();
-        a + b + c
+        let d = self.calc_winner_reward();
+        a + b + c + d
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
@@ -304,16 +321,10 @@ impl From<MyState> for [f32; 13] {
             .collect::<Vec<f32>>();
         let my_position = vec![f32::from(value.p0_position)];
         let enemy_position = vec![f32::from(value.p1_position)];
-        [
-            id,
-            hands,
-            cards,
-            my_position,
-            enemy_position,
-        ]
-        .concat()
-        .try_into()
-        .expect("長さが13")
+        [id, hands, cards, my_position, enemy_position]
+            .concat()
+            .try_into()
+            .expect("長さが13")
     }
 }
 
@@ -348,7 +359,7 @@ impl MyAgent {
                 p1_position: position_1,
                 prev_state: None,
                 prev_action: None,
-                round_end: false,
+                round_winner: None,
                 game_end: false,
             },
         }
@@ -375,9 +386,9 @@ impl Agent<MyState> for MyAgent {
         // そのため、break(つまりこのループを抜け、ライブラリ側のloopにまわす)を使うのはHnadInfoとGameEndの時のみです。ServerErrorは例外です。
         let mut take_action_result = || -> io::Result<()> {
             loop {
-                if self.state.round_end {
+                if self.state.round_winner.is_some() {
                     self.state.used = UsedCards::new();
-                    self.state.round_end = false;
+                    self.state.round_winner = None;
                 }
                 match Messages::parse(&read_stream(&mut self.reader)?) {
                     Ok(messages) => match messages {
@@ -417,7 +428,12 @@ impl Agent<MyState> for MyAgent {
                                 1 => self.state.p1_score += 1,
                                 _ => {}
                             }
-                            self.state.round_end = true;
+                            self.state.round_winner = Some(
+                                u8::try_from(round_end.round_winner())
+                                    .ok()
+                                    .and_then(PlayerID::from_u8),
+                            );
+                            break;
                         }
                         GameEnd(game_end) => {
                             print(format!("ゲーム終わり! 勝者:{}", game_end.winner()).as_str())?;
