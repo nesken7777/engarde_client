@@ -9,9 +9,9 @@ use std::{
 
 use apply::Also;
 use clap::{Parser, ValueEnum};
+#[allow(clippy::wildcard_imports)]
+use dfdx::nn::modules::*;
 use dfdx::{
-    nn::modules::{Linear, ReLU},
-    prelude::{AccurateGeLU, Exp, FastGeLU, LeakyReLU, Ln, Sigmoid, Softmax, Tanh},
     shapes::Const,
     tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
 };
@@ -478,7 +478,20 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
     Ok(())
 }
 
-fn evaluation(
+fn evaluation_continuous(
+    agent: &mut MyAgent,
+    termination_strategy: &mut dyn TerminationStrategy<MyState>,
+    best_exploration_strategy: &mut BestExplorationDqnContinuous,
+) {
+    loop {
+        best_exploration_strategy.pick_action(agent);
+        if termination_strategy.should_stop(agent.current_state()) {
+            break;
+        }
+    }
+}
+
+fn evaluation_discrete(
     agent: &mut MyAgent,
     termination_strategy: &mut dyn TerminationStrategy<MyState>,
     best_exploration_strategy: &mut BestExplorationDqnDiscrete,
@@ -573,7 +586,7 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
         })
     };
     trainer.import_model(past_exp.clone());
-    evaluation(
+    evaluation_discrete(
         &mut agent,
         &mut SinkStates {},
         &mut BestExplorationDqnDiscrete::new(trainer),
