@@ -161,7 +161,7 @@ impl MyState {
                 .unwrap_or(Ratio::<u64>::zero())
                 .to_f64()
                 .expect("安心して")
-                .mul(20.0)
+                .mul(200.0)
             }
             _ => 0.0,
         }
@@ -179,9 +179,18 @@ impl MyState {
         }
     }
 
+    fn distance_between_enemy(&self) -> u8 {
+        self.p1_position - self.p0_position
+    }
+
     #[allow(clippy::float_arithmetic)]
     fn calc_position_reward(&self) -> f64 {
-        f64::from(self.distance_from_center()).neg() * 40.0
+        f64::from(self.distance_from_center()).mul(10.0).powi(2)
+            * if self.distance_from_center() > 0 {
+                -1.0
+            } else {
+                1.0
+            }
     }
 
     fn calc_winner_reward(&self) -> f64 {
@@ -189,9 +198,9 @@ impl MyState {
             None | Some(None) => 0.0,
             Some(Some(n)) => {
                 if n == self.my_id {
-                    1000.0
+                    100000.0
                 } else {
-                    -1000.0
+                    -100000.0
                 }
             }
         }
