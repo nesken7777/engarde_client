@@ -456,7 +456,7 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
     let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
         .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
         .unwrap_or(u64::MAX);
-    let epsilon = (epsilon - (epsilon / 200)).max(u64::MAX / 20);
+    let epsilon = (epsilon - (u64::MAX / 200)).max(u64::MAX / 20);
     let mut epsilon_greedy_exploration = EpsilonGreedyDiscrete::new(trainer2, epsilon);
     trainer.train(
         &mut agent,
