@@ -461,7 +461,7 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &mut epsilon_greedy_exploration,
+        &mut RandomExploration,
     );
     {
         let learned_values = trainer.export_learned_values();
