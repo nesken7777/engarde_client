@@ -427,21 +427,21 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 (
                     Linear {
                         weight: weight2,
                         bias: bias2,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 Linear {
                     weight: weight_out,
@@ -590,21 +590,21 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 (
                     Linear {
                         weight: weight1,
                         bias: bias1,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 (
                     Linear {
                         weight: weight2,
                         bias: bias2,
                     },
-                    ReLU,
+                    LeakyReLU::default(),
                 ),
                 Linear {
                     weight: weight_out,
