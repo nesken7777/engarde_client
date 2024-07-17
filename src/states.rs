@@ -120,7 +120,7 @@ impl MyState {
         }
     }
 
-    fn distance_opposite(&self) -> u8 {
+    pub fn distance_opposite(&self) -> u8 {
         self.p1_position - self.p0_position
     }
 
@@ -199,6 +199,42 @@ impl MyState {
                 }
             }
         }
+    }
+
+    fn to_evaluation(&self) -> Evaluation {
+        let actions = self
+            .actions()
+            .into_iter()
+            .filter(|action| !matches!(action, Action::Attack(_)))
+            .collect::<Vec<Action>>();
+        let card_map = card_map_from_hands(self.hands()).expect("安心して");
+        let distance = self.distance_opposite();
+        let rest_cards = self.used_cards().to_restcards(card_map);
+        let hands = self.hands();
+        let table = &ProbabilityTable::new(&self.used_cards().to_restcards(card_map));
+        let safe_sum = actions
+            .iter()
+            .map(|&action| {
+                safe_possibility(distance, rest_cards, hands, table, action)
+                    .unwrap_or(Ratio::<u64>::zero())
+            })
+            .sum::<Ratio<u64>>();
+        let mut evaluation_set = Evaluation::new();
+        if safe_sum == Ratio::zero() {
+            return evaluation_set;
+        }
+        actions
+            .into_iter()
+            .map(|action| {
+                (
+                    action,
+                    safe_possibility(distance, rest_cards, hands, table, action)
+                        .unwrap_or(Ratio::zero())
+                        / safe_sum,
+                )
+            })
+            .for_each(|(action, eval)| evaluation_set.update(action, eval));
+        evaluation_set
     }
 }
 
@@ -409,7 +445,7 @@ impl Agent<MyState> for MyAgent {
                         }
                         Accept(_) => {}
                         DoPlay(_) => {
-                            send_info(&mut self.writer, &Evaluation::new())?;
+                            send_info(&mut self.writer, &self.state.to_evaluation())?;
                             send_action(&mut self.writer, action)?;
                             self.state.prev_state = Some(Box::new(self.state.clone()));
                             self.state.prev_action = Some(action);

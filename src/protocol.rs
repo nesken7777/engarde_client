@@ -5,14 +5,19 @@ use std::str::FromStr;
 use std::{error::Error, fmt::Display};
 
 use apply::Also;
+use num_rational::Ratio;
+use num_traits::{ToPrimitive, Zero};
+use rurel::mdp::State;
 use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::*;
 use serde_json::Value;
 use serde_with::skip_serializing_none;
 
+use crate::algorithm::{card_map_from_hands, safe_possibility, ProbabilityTable};
 use crate::errors::Errors;
 
+use crate::states::MyState;
 use crate::{Action, Attack, CardID, Direction, Maisuu, Movement};
 
 /// サーバーから送られてくるプレイヤーIDを示します。
@@ -703,7 +708,7 @@ impl Evaluation {
             typ: "Evaluation",
             from: "Client",
             to: "Server",
-            eval_1f: Some("1.0".to_string()),
+            eval_1f: None,
             eval_1b: None,
             eval_2f: None,
             eval_2b: None,
@@ -713,6 +718,27 @@ impl Evaluation {
             eval_4b: None,
             eval_5f: None,
             eval_5b: None,
+        }
+    }
+
+    pub fn update(&mut self, action: Action, eval: Ratio<u64>) {
+        use CardID::{Five, Four, One, Three, Two};
+        use Direction::{Back, Forward};
+        let eval = Some(eval.to_f64().expect("f64に変換できなかった").to_string());
+        match action {
+            Action::Move(m) => match (m.direction(), m.card()) {
+                (Forward, One) => self.eval_1f = eval,
+                (Forward, Two) => self.eval_2f = eval,
+                (Forward, Three) => self.eval_3f = eval,
+                (Forward, Four) => self.eval_4f = eval,
+                (Forward, Five) => self.eval_5f = eval,
+                (Back, One) => self.eval_1b = eval,
+                (Back, Two) => self.eval_2b = eval,
+                (Back, Three) => self.eval_3b = eval,
+                (Back, Four) => self.eval_4b = eval,
+                (Back, Five) => self.eval_5b = eval,
+            },
+            Action::Attack(_) => panic!("すみませんこちらの評価はありません！"),
         }
     }
 }
