@@ -502,6 +502,8 @@ impl Agent<MyState> for MyAgent {
                             break;
                         }
                         GameEnd(game_end) => {
+                            self.state.round_winner = Some(PlayerID::from_u8(game_end.winner()));
+                            self.state.game_end = true;
                             print(format!("ゲーム終わり! 勝者:{}", game_end.winner()).as_str())?;
                             print(if game_end.winner() == self.state.my_id.denote() {
                                 "AIが勝ちました!"
@@ -519,8 +521,6 @@ impl Agent<MyState> for MyAgent {
                                 "safe_possibilityの寄与:{}",
                                 self.state.calc_safe_reward()
                             ))?;
-                            self.state.round_winner = Some(PlayerID::from_u8(game_end.winner()));
-                            self.state.game_end = true;
                             break;
                         }
                     },
