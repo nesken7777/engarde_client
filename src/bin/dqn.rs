@@ -208,7 +208,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
             let available_action_indicies = current_state
                 .actions()
                 .into_iter()
-                .map(|action| action.as_index())
+                .map(|action| action.to_index())
                 .collect::<Vec<usize>>();
             // 評価値のリストを取得
             let expected_values = self.past_exp.expected_value(current_state);
@@ -254,7 +254,7 @@ impl ExplorationStrategy<MyState> for BestExplorationDqnDiscrete {
         let available_action_indicies = current_state
             .actions()
             .into_iter()
-            .map(|action| action.as_index())
+            .map(|action| action.to_index())
             .collect::<Vec<usize>>();
 
         // 評価値のリストを取得
