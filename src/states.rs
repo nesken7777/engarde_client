@@ -201,6 +201,31 @@ impl MyState {
         }
     }
 
+    fn action_reward(&self) -> f64 {
+        match self.prev_action {
+            None => 0.0,
+            Some(action) => match action {
+                Action::Move(m) => match m.direction() {
+                    Direction::Forward => match self.round_winner {
+                        None | Some(None) => 500.0,
+                        Some(Some(player)) if player == self.my_id() => 2000.0,
+                        Some(Some(_)) => -1500.0,
+                    },
+                    Direction::Back => match self.round_winner {
+                        None | Some(None) => 0.0,
+                        Some(Some(player)) if player == self.my_id() => 1000.0,
+                        Some(Some(_)) => -5000.0,
+                    },
+                },
+                Action::Attack(_) => match self.round_winner {
+                    None | Some(None) => 700.0,
+                    Some(Some(player)) if player == self.my_id() => 3000.0,
+                    Some(Some(_)) => -1000.0,
+                },
+            },
+        }
+    }
+
     fn to_evaluation(&self) -> Evaluation {
         let actions = self
             .actions()
@@ -248,7 +273,8 @@ impl State for MyState {
         let b = 0.0;
         let c = self.calc_position_reward();
         let d = self.calc_winner_reward();
-        a + b + c + d
+        let e = self.action_reward();
+        a + b + c + d + e
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
