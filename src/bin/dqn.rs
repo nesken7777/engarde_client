@@ -338,7 +338,7 @@ struct RandomExploration2(DQNAgentTrainerDiscreate);
 impl ExplorationStrategy<MyState> for RandomExploration2 {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let expected = self.0.expected_value(agent.current_state());
-        println!("{:.2?}", expected);
+        // println!("{expected:.2?}");
         assert_ne!(expected[0], 320000f32, "NaN値になってます！");
         agent.pick_random_action()
     }
@@ -507,6 +507,12 @@ fn evaluation_discrete(
 ) {
     loop {
         best_exploration_strategy.pick_action(agent);
+        println!(
+            "{:.2?}",
+            best_exploration_strategy
+                .0
+                .expected_value(agent.current_state())
+        );
         if termination_strategy.should_stop(agent.current_state()) {
             break;
         }
