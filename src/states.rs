@@ -6,7 +6,7 @@ use std::{
     hash::RandomState,
     io::{self, BufReader, BufWriter},
     net::TcpStream,
-    ops::{Mul, Neg},
+    ops::Mul,
 };
 
 use apply::Also;
@@ -174,8 +174,8 @@ impl MyState {
 
     fn distance_from_center(&self) -> i8 {
         match self.my_id {
-            PlayerID::Zero => 12 - i8::try_from(self.p0_position).expect("i8の表現範囲外"),
-            PlayerID::One => i8::try_from(self.p1_position).expect("i8の表現範囲外") - 12,
+            PlayerID::Zero => i8::try_from(self.p0_position).expect("i8の表現範囲外") - 12,
+            PlayerID::One => 12 - i8::try_from(self.p1_position).expect("i8の表現範囲外"),
         }
     }
 
