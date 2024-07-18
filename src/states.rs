@@ -372,21 +372,21 @@ impl State for MyState {
 // }
 impl From<MyState> for [f32; 13] {
     fn from(value: MyState) -> Self {
-        let id = vec![f32::from(value.my_id.denote())];
+        let id = vec![f32::from(value.my_id.denote()) * 100.0];
         let hands = value
             .hands
             .into_iter()
-            .map(|x| f32::from(x.denote()))
+            .map(|x| f32::from(x.denote()) * 100.0)
             .collect::<Vec<f32>>()
             .also(|hands| hands.resize(5, 0.0));
         let cards = value
             .used
             .into_inner()
             .iter()
-            .map(|&x| f32::from(x.denote()))
+            .map(|&x| f32::from(x.denote()) * 100.0)
             .collect::<Vec<f32>>();
-        let my_position = vec![f32::from(value.p0_position)];
-        let enemy_position = vec![f32::from(value.p1_position)];
+        let my_position = vec![f32::from(value.p0_position) * 100.0];
+        let enemy_position = vec![f32::from(value.p1_position) * 100.0];
         [id, hands, cards, my_position, enemy_position]
             .concat()
             .try_into()
