@@ -10,19 +10,17 @@ use crate::{
     strategy::{explore::ExplorationStrategy, terminate::TerminationStrategy},
 };
 
-const BATCH: usize = 128;
+const BATCH: usize = 32;
 
 type QNetwork<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (Linear<STATE_SIZE, INNER_SIZE>, LeakyReLU<f32>),
-    (Linear<INNER_SIZE, INNER_SIZE>, LeakyReLU<f32>),
-    (Linear<INNER_SIZE, INNER_SIZE>, LeakyReLU<f32>),
+    (Linear<STATE_SIZE, INNER_SIZE>, ReLU),
+    (Linear<INNER_SIZE, INNER_SIZE>, ReLU),
     Linear<INNER_SIZE, ACTION_SIZE>,
 );
 
 type QNetworkDevice<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, LeakyReLU<f32>),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, LeakyReLU<f32>),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, LeakyReLU<f32>),
+    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
+    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
     nn::modules::Linear<INNER_SIZE, ACTION_SIZE, f32, Cpu>,
 );
 
