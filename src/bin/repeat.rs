@@ -16,6 +16,7 @@ const MAX_ROUND: u32 = 100;
 enum Client {
     Dqn,
     Random,
+    RandomForward,
     Algorithm,
     Aggressive,
 }
@@ -31,6 +32,9 @@ impl Client {
             Self::Random => Command::new(".\\random.exe")
                 .spawn()
                 .expect("random.exe起動失敗"),
+            Self::RandomForward => Command::new(".\\random_forward.exe")
+                .spawn()
+                .expect("random_forward.exe起動失敗"),
             Self::Algorithm => Command::new(".\\using_algorithm.exe")
                 .spawn()
                 .expect("using_algorithm.exe起動失敗"),
@@ -46,6 +50,7 @@ impl Display for Client {
         let s = match self {
             Self::Dqn => "dqn",
             Self::Random => "random",
+            Self::RandomForward => "random_forward",
             Self::Algorithm => "algorithm",
             Self::Aggressive => "aggressive",
         };
