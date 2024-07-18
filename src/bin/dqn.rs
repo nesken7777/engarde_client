@@ -333,6 +333,17 @@ impl ExplorationStrategy<MyState> for BestExplorationDqnContinuous {
     }
 }
 
+struct RandomExploration2(DQNAgentTrainerDiscreate);
+
+impl ExplorationStrategy<MyState> for RandomExploration2 {
+    fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
+        let expected = self.0.expected_value(agent.current_state());
+        println!("{:.2?}", expected);
+        assert_ne!(expected[0], 320000f32, "NaN値になってます！");
+        agent.pick_random_action()
+    }
+}
+
 struct NNFileNames {
     weight_in: String,
     bias_in: String,
@@ -457,11 +468,11 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
         .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
         .unwrap_or(u64::MAX);
     let epsilon = (epsilon - (epsilon / 200)).max(u64::MAX / 20);
-    let mut epsilon_greedy_exploration = EpsilonGreedyDiscrete::new(trainer2, epsilon);
+    // let mut epsilon_greedy_exploration = EpsilonGreedyDiscrete::new(trainer2, epsilon);
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &mut RandomExploration,
+        &mut RandomExploration2(trainer2),
     );
     {
         let learned_values = trainer.export_learned_values();
@@ -487,10 +498,10 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
         bias2.save_to_npy(files.bias2)?;
         weight_out.save_to_npy(files.weight_out)?;
         bias_out.save_to_npy(files.bias_out)?;
-        fs::write(
-            format!("learned_dqn/{}/epsilon.txt", id.denote()),
-            epsilon_greedy_exploration.epsilon.to_string(),
-        )?;
+        // fs::write(
+        //     format!("learned_dqn/{}/epsilon.txt", id.denote()),
+        //     epsilon_greedy_exploration.epsilon.to_string(),
+        // )?;
     }
     Ok(())
 }
