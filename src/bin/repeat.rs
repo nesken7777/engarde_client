@@ -3,6 +3,8 @@
 use std::{
     fmt::{Display, Formatter, Result},
     process::{Child, Command},
+    thread,
+    time::Duration,
 };
 
 use clap::{Parser, ValueEnum};
@@ -93,6 +95,7 @@ fn client_loop(client0: Client, client1: Client, loop_count: usize, max_round: u
             .spawn()
             .expect("engarde_server.exe起動失敗");
         let mut client0 = client0.execute();
+        thread::sleep(Duration::from_millis(50));
         let mut client1 = client1.execute();
         server.wait().expect("engarde_serverクラッシュ");
         client0.wait().expect("p0クラッシュ");
