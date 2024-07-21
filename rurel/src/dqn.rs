@@ -10,17 +10,39 @@ use crate::{
     strategy::{explore::ExplorationStrategy, terminate::TerminationStrategy},
 };
 
-const BATCH: usize = 32;
+const BATCH: usize = 1024;
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct Mish;
+
+impl ZeroSizedModule for Mish {}
+impl NonMutableModule for Mish {}
+
+impl<S: Shape, E: Dtype, D: Device<E>, T: Tape<E, D>> Module<Tensor<S, E, D, T>> for Mish {
+    type Output = Tensor<S, E, D, T>;
+    type Error = D::Err;
+
+    fn try_forward(&self, input: Tensor<S, E, D, T>) -> Result<Self::Output, D::Err> {
+        let mut cloned = input.device().zeros_like(&input).retaped::<T>();
+        cloned.copy_from(&input.as_vec());
+        Ok(cloned
+            * (input.device().ones_like(&input).retaped::<T>() + input.try_exp()?)
+                .try_ln()?
+                .try_tanh()?)
+    }
+}
 
 type QNetwork<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (Linear<STATE_SIZE, INNER_SIZE>, ReLU),
-    (Linear<INNER_SIZE, INNER_SIZE>, ReLU),
+    (Linear<STATE_SIZE, INNER_SIZE>, Mish),
+    (Linear<INNER_SIZE, INNER_SIZE>, Mish),
+    (Linear<INNER_SIZE, INNER_SIZE>, Mish),
     Linear<INNER_SIZE, ACTION_SIZE>,
 );
 
 type QNetworkDevice<const STATE_SIZE: usize, const ACTION_SIZE: usize, const INNER_SIZE: usize> = (
-    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
-    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, ReLU),
+    (nn::modules::Linear<STATE_SIZE, INNER_SIZE, f32, Cpu>, Mish),
+    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, Mish),
+    (nn::modules::Linear<INNER_SIZE, INNER_SIZE, f32, Cpu>, Mish),
     nn::modules::Linear<INNER_SIZE, ACTION_SIZE, f32, Cpu>,
 );
 

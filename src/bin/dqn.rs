@@ -17,7 +17,7 @@ use dfdx::{
 };
 use rand::{thread_rng, Rng};
 use rurel::{
-    dqn::DQNAgentTrainer,
+    dqn::{DQNAgentTrainer, Mish},
     mdp::{Agent, State},
     strategy::{
         explore::{ExplorationStrategy, RandomExploration},
@@ -38,6 +38,7 @@ const INNER_DISCREATE: usize = 64;
 const ACTION_SIZE_DISCREATE: usize = 35;
 const INNER_CONTINUOUS: usize = 64;
 const ACTION_SIZE_CONTINUOUS: usize = 3;
+const INNER_KAZU: usize = 2;
 
 type DQNAgentTrainerDiscreate =
     DQNAgentTrainer<MyState, STATE_SIZE, ACTION_SIZE_DISCREATE, INNER_DISCREATE>;
@@ -347,8 +348,7 @@ impl ExplorationStrategy<MyState> for RandomExploration2 {
 struct NNFileNames {
     weight_in: String,
     bias_in: String,
-    weight1: String,
-    bias1: String,
+    inner: Vec<(String, String)>,
     weight_out: String,
     bias_out: String,
 }
@@ -357,8 +357,14 @@ fn files_name(id: u8) -> NNFileNames {
     NNFileNames {
         weight_in: format!("learned_dqn/{id}/weight_in.npy"),
         bias_in: format!("learned_dqn/{id}/bias_in.npy"),
-        weight1: format!("learned_dqn/{id}/weight1.npy"),
-        bias1: format!("learned_dqn/{id}/bias1.npy"),
+        inner: (1..=INNER_KAZU)
+            .map(|x| {
+                (
+                    format!("learned_dqn/{id}/weight{x}.npy"),
+                    format!("learned_dqn/{id}/bias{x}.npy"),
+                )
+            })
+            .collect(),
         weight_out: format!("learned_dqn/{id}/weight_out.npy"),
         bias_out: format!("learned_dqn/{id}/bias_out.npy"),
     }
@@ -410,16 +416,18 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
         let cpu = Cpu::default();
         let mut weight_in: WeightInTensor = cpu.zeros();
         let mut bias_in: BiasInTensor = cpu.zeros();
-        let mut weight1: WeightInnerTensor = cpu.zeros();
-        let mut bias1: BiasInnerTensor = cpu.zeros();
+        let mut inners: Vec<(WeightInnerTensor, BiasInnerTensor)> =
+            vec![(cpu.zeros(), cpu.zeros()); INNER_KAZU];
         let mut weight_out: WeightOutTensorDiscreate = cpu.zeros();
         let mut bias_out: BiasOutTensorDiscreate = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
             weight_in.load_from_npy(files.weight_in).ok()?;
             bias_in.load_from_npy(files.bias_in).ok()?;
-            weight1.load_from_npy(files.weight1).ok()?;
-            bias1.load_from_npy(files.bias1).ok()?;
+            inners[0].0.load_from_npy(files.inner[0].0.clone()).ok()?;
+            inners[0].1.load_from_npy(files.inner[0].1.clone()).ok()?;
+            inners[1].0.load_from_npy(files.inner[1].0.clone()).ok()?;
+            inners[1].1.load_from_npy(files.inner[1].1.clone()).ok()?;
             weight_out.load_from_npy(files.weight_out).ok()?;
             bias_out.load_from_npy(files.bias_out).ok()?;
             Some(())
@@ -431,14 +439,21 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    ReLU,
+                    Mish,
                 ),
                 (
                     Linear {
-                        weight: weight1,
-                        bias: bias1,
+                        weight: inners[0].0.clone(),
+                        bias: inners[0].1.clone(),
                     },
-                    ReLU,
+                    Mish,
+                ),
+                (
+                    Linear {
+                        weight: inners[1].0.clone(),
+                        bias: inners[1].1.clone(),
+                    },
+                    Mish,
                 ),
                 Linear {
                     weight: weight_out,
@@ -468,15 +483,20 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
         let linear1 = learned_values.1 .0;
         let weight1 = linear1.weight;
         let bias1 = linear1.bias;
-        let linear_out = learned_values.2;
+        let linear2 = learned_values.2 .0;
+        let weight2 = linear2.weight;
+        let bias2 = linear2.bias;
+        let linear_out = learned_values.3;
         let weight_out = linear_out.weight;
         let bias_out = linear_out.bias;
         let files = files_name(id.denote());
         let _ = create_dir_all(format!("learned_dqn/{}", id.denote()));
         weight_in.save_to_npy(files.weight_in)?;
         bias_in.save_to_npy(files.bias_in)?;
-        weight1.save_to_npy(files.weight1)?;
-        bias1.save_to_npy(files.bias1)?;
+        weight1.save_to_npy(files.inner[0].0.clone())?;
+        bias1.save_to_npy(files.inner[0].1.clone())?;
+        weight2.save_to_npy(files.inner[1].0.clone())?;
+        bias2.save_to_npy(files.inner[1].1.clone())?;
         weight_out.save_to_npy(files.weight_out)?;
         bias_out.save_to_npy(files.bias_out)?;
         // fs::write(
@@ -563,16 +583,18 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
         let cpu = Cpu::default();
         let mut weight_in: WeightInTensor = cpu.zeros();
         let mut bias_in: BiasInTensor = cpu.zeros();
-        let mut weight1: WeightInnerTensor = cpu.zeros();
-        let mut bias1: BiasInnerTensor = cpu.zeros();
+        let mut inners: Vec<(WeightInnerTensor, BiasInnerTensor)> =
+            vec![(cpu.zeros(), cpu.zeros()); INNER_KAZU];
         let mut weight_out: WeightOutTensorDiscreate = cpu.zeros();
         let mut bias_out: BiasOutTensorDiscreate = cpu.zeros();
         let files = files_name(id.denote());
         (|| {
             weight_in.load_from_npy(files.weight_in).ok()?;
             bias_in.load_from_npy(files.bias_in).ok()?;
-            weight1.load_from_npy(files.weight1).ok()?;
-            bias1.load_from_npy(files.bias1).ok()?;
+            inners[0].0.load_from_npy(files.inner[0].0.clone()).ok()?;
+            inners[0].1.load_from_npy(files.inner[0].1.clone()).ok()?;
+            inners[1].0.load_from_npy(files.inner[1].0.clone()).ok()?;
+            inners[1].1.load_from_npy(files.inner[1].1.clone()).ok()?;
             weight_out.load_from_npy(files.weight_out).ok()?;
             bias_out.load_from_npy(files.bias_out).ok()?;
             Some(())
@@ -584,14 +606,21 @@ fn dqn_eval(ip: SocketAddrV4) -> io::Result<()> {
                         weight: weight_in,
                         bias: bias_in,
                     },
-                    ReLU,
+                    Mish,
                 ),
                 (
                     Linear {
-                        weight: weight1,
-                        bias: bias1,
+                        weight: inners[0].0.clone(),
+                        bias: inners[0].1.clone(),
                     },
-                    ReLU,
+                    Mish,
+                ),
+                (
+                    Linear {
+                        weight: inners[1].0.clone(),
+                        bias: inners[1].1.clone(),
+                    },
+                    Mish,
                 ),
                 Linear {
                     weight: weight_out,
