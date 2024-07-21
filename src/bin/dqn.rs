@@ -479,15 +479,15 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
     trainer.import_model(past_exp.clone());
     let mut trainer2 = DQNAgentTrainer::new(DISCOUNT_RATE, LEARNING_RATE);
     trainer2.import_model(past_exp);
-    let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
-        .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
-        .unwrap_or(u64::MAX);
-    let epsilon = (epsilon - (epsilon / 200)).max(u64::MAX / 20);
-    // let mut epsilon_greedy_exploration = EpsilonGreedyDiscrete::new(trainer2, epsilon);
+    // let epsilon = fs::read_to_string(format!("learned_dqn/{}/epsilon.txt", id.denote()))
+    //     .map(|eps_str| eps_str.parse::<u64>().expect("εが適切なu64値でない"))
+    //     .unwrap_or(u64::MAX);
+    // let epsilon = (epsilon - (u64::MAX / 5000)).max(u64::MAX / 10);
+    // let mut epsilon_greedy_exploration = BestExplorationDqnDiscrete::new(trainer2, epsilon);
     trainer.train(
         &mut agent,
         &mut SinkStates {},
-        &mut RandomExploration2(trainer2),
+        &mut BestExplorationDqnDiscrete(trainer2),
     );
     {
         let learned_values = trainer.export_learned_values();
