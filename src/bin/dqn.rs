@@ -200,6 +200,9 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let mut rng = thread_rng();
         let random = rng.gen::<u64>();
+        let expected_values = self.past_exp.expected_value(agent.current_state());
+        print_actions_priority(expected_values);
+        assert_ne!(expected_values[0], 320000f32, "NaN値になってます！");
         if random < self.epsilon {
             agent.pick_random_action()
         } else {
@@ -212,9 +215,7 @@ impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
                 .map(|action| action.to_index())
                 .collect::<Vec<usize>>();
             // 評価値のリストを取得
-            let expected_values = self.past_exp.expected_value(current_state);
-            println!("{:.2?}", expected_values);
-            assert_ne!(expected_values[0], 320000f32, "NaN値になってます!");
+            // let expected_values = self.past_exp.expected_value(current_state);
             // 有効なアクションと評価値のリストを取得
             let available_actions = expected_values
                 .into_iter()
@@ -260,6 +261,7 @@ impl ExplorationStrategy<MyState> for BestExplorationDqnDiscrete {
 
         // 評価値のリストを取得
         let expected_values = self.0.expected_value(current_state);
+        print_actions_priority(expected_values);
         // 有効なアクションと評価値のリストを取得
         let available_actions = expected_values
             .into_iter()
@@ -281,6 +283,18 @@ impl ExplorationStrategy<MyState> for BestExplorationDqnDiscrete {
         agent.take_action(&action);
         action
     }
+}
+
+fn print_actions_priority(expected_values: [f32; 35]) {
+    let sorted_actions = expected_values
+        .into_iter()
+        .enumerate()
+        .collect::<Vec<_>>()
+        .also(|v| v.sort_unstable_by(|(_, x), (_, y)| y.total_cmp(x)))
+        .into_iter()
+        .map(|(i, _)| Action::from_index(i).to_string())
+        .collect::<Vec<_>>();
+    println!("{sorted_actions:?}");
 }
 
 struct EpsilonGreedyContinuous {
@@ -338,8 +352,8 @@ struct RandomExploration2(DQNAgentTrainerDiscreate);
 
 impl ExplorationStrategy<MyState> for RandomExploration2 {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        let expected = self.0.expected_value(agent.current_state());
-        // println!("{expected:.2?}");
+        let expected_values = self.0.expected_value(agent.current_state());
+        print_actions_priority(expected_values);
         assert_ne!(expected[0], 320000f32, "NaN値になってます！");
         agent.pick_random_action()
     }
@@ -527,12 +541,6 @@ fn evaluation_discrete(
 ) {
     loop {
         best_exploration_strategy.pick_action(agent);
-        println!(
-            "{:.2?}",
-            best_exploration_strategy
-                .0
-                .expected_value(agent.current_state())
-        );
         if termination_strategy.should_stop(agent.current_state()) {
             break;
         }

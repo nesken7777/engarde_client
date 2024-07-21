@@ -512,6 +512,20 @@ impl Action {
     }
 }
 
+impl Display for Action {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Action::Move(movement) => {
+                format!("{}{}", movement.card().denote(), movement.direction())
+            }
+            Action::Attack(attack) => {
+                format!("{}A{}", attack.card().denote(), attack.quantity().denote())
+            }
+        };
+        write!(f, "{s}")
+    }
+}
+
 impl From<Action> for [f32; 35] {
     fn from(value: Action) -> Self {
         [0_f32; 35].also(|arr| arr[value.to_index()] = 1.0)
