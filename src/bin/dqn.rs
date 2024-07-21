@@ -354,7 +354,7 @@ impl ExplorationStrategy<MyState> for RandomExploration2 {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let expected_values = self.0.expected_value(agent.current_state());
         print_actions_priority(expected_values);
-        assert_ne!(expected[0], 320000f32, "NaN値になってます！");
+        assert_ne!(expected_values[0], 320000f32, "NaN値になってます！");
         agent.pick_random_action()
     }
 }
