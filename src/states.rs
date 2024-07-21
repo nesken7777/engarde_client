@@ -169,7 +169,7 @@ impl MyState {
 
     #[allow(clippy::float_arithmetic)]
     fn calc_score_reward(&self) -> f64 {
-        (f64::from(self.my_score()) * 10.0) - (f64::from(self.enemy_score()) * 10.0)
+        (f64::from(self.my_score()) * 10.0).powi(2) - (f64::from(self.enemy_score()) * 10.0).powi(2)
     }
 
     fn distance_from_center(&self) -> i8 {
@@ -269,12 +269,13 @@ impl State for MyState {
     #[allow(clippy::float_arithmetic)]
     fn reward(&self) -> f64 {
         let a = self.calc_safe_reward();
-        // let b = self.calc_score_reward();
-        let b = 0.0;
+        let b = self.calc_score_reward();
+        // let b = 0.0;
         let c = self.calc_position_reward();
         let d = self.calc_winner_reward();
         let e = self.action_reward();
-        a + b + c + d + e
+        // a + c + d
+        b
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
