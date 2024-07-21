@@ -371,22 +371,29 @@ impl State for MyState {
 //     game_end: bool,
 // }
 impl From<MyState> for [f32; 13] {
+    #[allow(clippy::float_arithmetic)]
     fn from(value: MyState) -> Self {
-        let id = vec![f32::from(value.my_id.denote()) * 100.0];
+        // プレイヤーIDをf32値に変更
+        let id = vec![f32::from(value.my_id.denote())];
+        // 自分の手札(Vec)をf32値に変更、そのままVecとして表現
         let hands = value
             .hands
             .into_iter()
-            .map(|x| f32::from(x.denote()) * 100.0)
+            .map(|x| f32::from(x.denote() - 1) / 4.0)
             .collect::<Vec<f32>>()
             .also(|hands| hands.resize(5, 0.0));
+        // 使われたカード(インデックスとカード番号が対応、値と枚数が対応)をf32値に変更、そのままVecとして表現
         let cards = value
             .used
             .into_inner()
             .iter()
-            .map(|&x| f32::from(x.denote()) * 100.0)
+            .map(|&x| f32::from(x.denote()) / 5.0)
             .collect::<Vec<f32>>();
-        let my_position = vec![f32::from(value.p0_position) * 100.0];
-        let enemy_position = vec![f32::from(value.p1_position) * 100.0];
+        // プレイヤー0の位置をf32値に変更
+        let my_position = vec![f32::from(value.p0_position - 1) / 22.0];
+        // プレイヤー1の位置をf32値に変更
+        let enemy_position = vec![f32::from(value.p1_position - 1) / 22.0];
+        // 単一の配列としてまとめる
         [id, hands, cards, my_position, enemy_position]
             .concat()
             .try_into()
