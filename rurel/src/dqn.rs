@@ -264,7 +264,7 @@ where
                     break;
                 }
             }
-
+            assert!(dones.into_iter().any(|x| x), "満タン!");
             // train the network
             self.train_dqn(states, actions, next_states, rewards, dones);
 
