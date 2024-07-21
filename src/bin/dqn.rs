@@ -34,9 +34,9 @@ use engarde_client::{
 };
 
 const STATE_SIZE: usize = 13;
-const INNER_DISCREATE: usize = 64;
+const INNER_DISCREATE: usize = 128;
 const ACTION_SIZE_DISCREATE: usize = 35;
-const INNER_CONTINUOUS: usize = 64;
+const INNER_CONTINUOUS: usize = 128;
 const ACTION_SIZE_CONTINUOUS: usize = 3;
 const INNER_KAZU: usize = 2;
 
@@ -56,8 +56,8 @@ type WeightOutTensorDiscreate =
 type BiasOutTensorContinuous = Tensor<(Const<ACTION_SIZE_CONTINUOUS>,), f32, Cpu>;
 type BiasOutTensorDiscreate = Tensor<(Const<ACTION_SIZE_DISCREATE>,), f32, Cpu>;
 
-const DISCOUNT_RATE: f32 = 0.9;
-const LEARNING_RATE: f32 = 0.1;
+const DISCOUNT_RATE: f32 = 0.99999;
+const LEARNING_RATE: f32 = 0.00001;
 
 /// ベストに近いアクションを返す
 #[allow(dead_code, clippy::too_many_lines)]
