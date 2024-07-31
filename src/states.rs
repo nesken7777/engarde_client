@@ -169,7 +169,7 @@ impl MyState {
 
     #[allow(clippy::float_arithmetic)]
     fn calc_score_reward(&self) -> f64 {
-        (f64::from(self.my_score()) * 10.0).powi(2) - (f64::from(self.enemy_score()) * 10.0).powi(2)
+        f64::from(self.my_score()) - f64::from(self.enemy_score())
     }
 
     fn distance_from_center(&self) -> i8 {
@@ -193,9 +193,9 @@ impl MyState {
             None | Some(None) => 0.0,
             Some(Some(n)) => {
                 if n == self.my_id {
-                    10000.0
+                    1.0
                 } else {
-                    -10000.0
+                    -1.0
                 }
             }
         }
@@ -207,20 +207,20 @@ impl MyState {
             Some(action) => match action {
                 Action::Move(m) => match m.direction() {
                     Direction::Forward => match self.round_winner {
-                        None | Some(None) => 500.0,
-                        Some(Some(player)) if player == self.my_id() => 2000.0,
-                        Some(Some(_)) => -1500.0,
+                        None | Some(None) => 0.05,
+                        Some(Some(player)) if player == self.my_id() => 0.05,
+                        Some(Some(_)) => 0.05,
                     },
                     Direction::Back => match self.round_winner {
-                        None | Some(None) => 0.0,
-                        Some(Some(player)) if player == self.my_id() => 1000.0,
-                        Some(Some(_)) => -5000.0,
+                        None | Some(None) => -0.05,
+                        Some(Some(player)) if player == self.my_id() => -0.05,
+                        Some(Some(_)) => -0.05,
                     },
                 },
                 Action::Attack(_) => match self.round_winner {
-                    None | Some(None) => 700.0,
-                    Some(Some(player)) if player == self.my_id() => 3000.0,
-                    Some(Some(_)) => -1000.0,
+                    None | Some(None) => 0.1,
+                    Some(Some(player)) if player == self.my_id() => 0.1,
+                    Some(Some(_)) => 0.1,
                 },
             },
         }
@@ -269,13 +269,15 @@ impl State for MyState {
     #[allow(clippy::float_arithmetic)]
     fn reward(&self) -> f64 {
         let a = self.calc_safe_reward();
-        let b = self.calc_score_reward();
-        // let b = 0.0;
-        let c = self.calc_position_reward();
-        let d = self.calc_winner_reward();
-        let e = self.action_reward();
-        // a + c + d
-        b
+        let b = self.calc_position_reward();
+        let c = self.calc_winner_reward();
+        let d = self.action_reward();
+        let e = if self.game_end() {
+            self.calc_score_reward()
+        } else {
+            0.0
+        };
+        c
     }
     fn actions(&self) -> Vec<Action> {
         fn attack_cards(hands: &[CardID], card: CardID) -> Option<Action> {
