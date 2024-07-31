@@ -229,40 +229,35 @@ fn main() -> io::Result<()> {
     {
         let mut state = MyStateAlg::new(id, vec![], UsedCards::new(), 1, 23);
         loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(messages) => match messages {
-                    Messages::BoardInfo(board_info) => {
-                        state.update_board(&board_info);
+            let messages = Messages::parse(&read_stream(&mut bufreader)?).expect("JSON解析失敗");
+            match messages {
+                Messages::BoardInfo(board_info) => {
+                    state.update_board(&board_info);
+                }
+                Messages::HandInfo(hand_info) => {
+                    state.update_hands(hand_info.to_vec());
+                }
+                Messages::Accept(_) => (),
+                Messages::DoPlay(_) => {
+                    let action = act(&state).unwrap_or_else(|| panic!("行動決定不能"));
+                    send_info(&mut bufwriter, &state.to_evaluation())?;
+                    send_action(&mut bufwriter, action)?;
+                    state.used.used_action(action);
+                }
+                Messages::ServerError(e) => {
+                    print("エラーもらった")?;
+                    print(format!("{e:?}"))?;
+                    break;
+                }
+                Messages::Played(played) => state.used.used_action(played.to_action()),
+                Messages::RoundEnd(_round_end) => {
+                    state.used = UsedCards::new();
+                }
+                Messages::GameEnd(game_end) => {
+                    if game_end.winner() == state.id.denote() {
+                        print("algorithmの勝ち")?;
                     }
-                    Messages::HandInfo(hand_info) => {
-                        state.update_hands(hand_info.to_vec());
-                    }
-                    Messages::Accept(_) => (),
-                    Messages::DoPlay(_) => {
-                        let action = act(&state).unwrap_or_else(|| panic!("行動決定不能"));
-                        send_info(&mut bufwriter, &state.to_evaluation())?;
-                        send_action(&mut bufwriter, action)?;
-                        state.used.used_action(action);
-                    }
-                    Messages::ServerError(e) => {
-                        print("エラーもらった")?;
-                        print(format!("{e:?}"))?;
-                        break;
-                    }
-                    Messages::Played(played) => state.used.used_action(played.to_action()),
-                    Messages::RoundEnd(_round_end) => {
-                        state.used = UsedCards::new();
-                    }
-                    Messages::GameEnd(game_end) => {
-                        if game_end.winner() == state.id.denote() {
-                            print("algorithmの勝ち")?;
-                        }
-                        break;
-                    }
-                },
-                Err(e) => {
-                    print("JSON解析できなかった")?;
-                    print(format!("{e}"))?;
+                    break;
                 }
             }
         }

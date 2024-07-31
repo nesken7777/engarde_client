@@ -163,37 +163,32 @@ fn random_main() -> io::Result<()> {
     {
         let mut state = MyState::new(id, vec![], 1, 23);
         loop {
-            match Messages::parse(&read_stream(&mut bufreader)?) {
-                Ok(messages) => match messages {
-                    Messages::BoardInfo(board_info) => {
-                        state.update_board(&board_info);
+            let messages = Messages::parse(&read_stream(&mut bufreader)?).expect("JSON解析失敗");
+            match messages {
+                Messages::BoardInfo(board_info) => {
+                    state.update_board(&board_info);
+                }
+                Messages::HandInfo(hand_info) => {
+                    state.update_hands(hand_info.to_vec());
+                }
+                Messages::Accept(_) => (),
+                Messages::DoPlay(_) => {
+                    let action = state.act(rng).unwrap_or_else(|| panic!("行動決定不能"));
+                    send_info(&mut bufwriter, &Evaluation::new())?;
+                    send_action(&mut bufwriter, action)?;
+                }
+                Messages::ServerError(e) => {
+                    print("エラーもらった")?;
+                    print(format!("{e:?}"))?;
+                    break;
+                }
+                Messages::Played(_) => {}
+                Messages::RoundEnd(_round_end) => {}
+                Messages::GameEnd(game_end) => {
+                    if game_end.winner() == state.id.denote() {
+                        print("randomの勝ち")?;
                     }
-                    Messages::HandInfo(hand_info) => {
-                        state.update_hands(hand_info.to_vec());
-                    }
-                    Messages::Accept(_) => (),
-                    Messages::DoPlay(_) => {
-                        let action = state.act(rng).unwrap_or_else(|| panic!("行動決定不能"));
-                        send_info(&mut bufwriter, &Evaluation::new())?;
-                        send_action(&mut bufwriter, action)?;
-                    }
-                    Messages::ServerError(e) => {
-                        print("エラーもらった")?;
-                        print(format!("{e:?}"))?;
-                        break;
-                    }
-                    Messages::Played(_) => {}
-                    Messages::RoundEnd(_round_end) => {}
-                    Messages::GameEnd(game_end) => {
-                        if game_end.winner() == state.id.denote() {
-                            print("randomの勝ち")?;
-                        }
-                        break;
-                    }
-                },
-                Err(e) => {
-                    print("JSON解析できなかった")?;
-                    print(format!("{e}"))?;
+                    break;
                 }
             }
         }
