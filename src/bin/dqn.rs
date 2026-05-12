@@ -17,7 +17,7 @@ use dfdx::{
     shapes::Const,
     tensor::{Cpu, NoneTape, Tensor, ZerosTensor},
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use rurel::{
     dqn::DQNAgentTrainer,
     mdp::{Agent, State},
@@ -28,11 +28,10 @@ use rurel::{
 };
 
 use engarde_client::{
-    get_id,
+    Action, CardID, Direction, get_id,
     protocol::{BoardInfo, Messages, PlayerName},
     read_stream, send_info,
     states::{MyAgent, MyState},
-    Action, CardID, Direction,
 };
 
 const STATE_SIZE: usize = 13;
@@ -202,7 +201,7 @@ impl EpsilonGreedyDiscrete {
 impl ExplorationStrategy<MyState> for EpsilonGreedyDiscrete {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
         let mut rng = thread_rng();
-        let random = rng.gen::<u64>();
+        let random = rng.r#gen::<u64>();
         let expected_values = self.past_exp.expected_value(agent.current_state());
         println!("{expected_values:.2?}");
         #[cfg(feature = "print_priority")]
@@ -320,7 +319,7 @@ impl EpsilonGreedyContinuous {
 
 impl ExplorationStrategy<MyState> for EpsilonGreedyContinuous {
     fn pick_action(&mut self, agent: &mut dyn Agent<MyState>) -> <MyState as State>::A {
-        let random = thread_rng().gen::<u64>();
+        let random = thread_rng().r#gen::<u64>();
         if random < self.epsilon {
             agent.pick_random_action()
         } else {
@@ -546,19 +545,19 @@ fn dqn_train(ip: SocketAddrV4) -> io::Result<()> {
     );
     {
         let learned_values = trainer.export_learned_values();
-        let linear_in = learned_values.0 .0;
+        let linear_in = learned_values.0.0;
         let weight_in = linear_in.weight;
         let bias_in = linear_in.bias;
-        let linear1 = learned_values.1 .0;
+        let linear1 = learned_values.1.0;
         let weight1 = linear1.weight;
         let bias1 = linear1.bias;
         // let linear2 = learned_values.2 .0;
         // let weight2 = linear2.weight;
         // let bias2 = linear2.bias;
-        let norm1 = learned_values.0 .1;
+        let norm1 = learned_values.0.1;
         let gamma1 = norm1.gamma;
         let beta1 = norm1.beta;
-        let norm2 = learned_values.1 .1;
+        let norm2 = learned_values.1.1;
         let gamma2 = norm2.gamma;
         let beta2 = norm2.beta;
         let linear_out = learned_values.2;
